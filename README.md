@@ -7,4 +7,5 @@ Link: <https://portswigger.net/web-security/all-topics>
 持續更新中...
 
 ---
-[File Upload Vulnerabilities Summary](./File Upload Vulnerabilities Summary.md)
+
+* ![File Upload Vulnerabilities Summary](./File Upload Vulnerabilities Summary.md)
