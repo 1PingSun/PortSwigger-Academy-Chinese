@@ -8,4 +8,4 @@ Link: <https://portswigger.net/web-security/all-topics> 
 
 ---
 
-[File Upload Vulnerabilities Summary](File:../File Upload Vulnerabilities Summary.md)
+- [檔案上傳漏洞重點整理](../File%20Upload%20Vulnerabilities%20Summary.md)
