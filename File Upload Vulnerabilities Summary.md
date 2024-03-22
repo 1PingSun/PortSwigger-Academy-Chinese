@@ -194,4 +194,4 @@ Content-Length: 49
 
 最後附上七個 Lab 全部完成的截圖：
 
-![Screenshot 2024-03-18 at 11.49.12 AM.png](File%20Upload%20Vulnerabilities%20Summary%204781175b6b9b4123b547e62c40ba53de/Screenshot_2024-03-18_at_11.49.12_AM.png)
+![Screenshot 2024-03-18 at 11.49.12 AM.png](files/Screenshot_2024-03-18_at_11.49.12_AM.png)
