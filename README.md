@@ -8,5 +8,5 @@ Link: <https://portswigger.net/web-security/all-topics> 
 
 ---
 
-- [檔案上傳漏洞重點整理](../File%20Upload%20Vulnerabilities%20Summary.md)
-- [SQL 注入攻擊](../SQL%20injection%20Summary.md)
+- [檔案上傳漏洞重點整理](File%20Upload%20Vulnerabilities%20Summary.md)
+- [SQL 注入攻擊](SQL%20injection%20Summary.md)
