@@ -45,7 +45,7 @@ Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net
 
 將上方內容製作成 `.php` 檔上傳後，就可以在網址後方，透過修改 `command` 參數來執行任何的 Shell 指令。
 
-- **Lab: Remote code execution via web shell upload APPRENTICE**
+- [**Lab: Remote code execution via web shell upload APPRENTICE**](https://portswigger.net/web-security/file-upload/lab-file-upload-remote-code-execution-via-web-shell-upload)
     1. 根據[指引](https://portswigger.net/web-security/file-upload/lab-file-upload-remote-code-execution-via-web-shell-upload)，得知密碼儲存在 `/home/carlos/secre`。
     2. 撰寫一個 `test.php` 的檔案，並上傳網頁。
         1. 檔案為 PHP 語法，透過 `passthru()` 讀取 `/home/carlos/secre` 的內容
@@ -62,13 +62,13 @@ Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net
 
 ### 限制檔案類型的漏洞
 
-- **Lab: Web shell upload via Content-Type restriction bypass**
+- [**Lab: Web shell upload via Content-Type restriction bypass**](https://portswigger.net/web-security/file-upload/lab-file-upload-web-shell-upload-via-content-type-restriction-bypass)
     1. 上傳與上一個 Lab 相同的 `test.php` 檔案後，發現跳出錯誤訊息：檔案類型不可是 `text/php`，只能是 `image/jpeg` 或 `image/png`。
     2. 透過 Burp Suite 修改封包，將請求封包中，原本的 `text/php` 修改成 `image/jpeg`，再上傳後打開預覽照片，就得到密碼了！
 
 ### 對用戶可訪問的目錄進行限制
 
-- **Lab: Preventing file execution in user-accessible directories**
+- [**Lab: Web shell upload via path traversal**](https://portswigger.net/web-security/file-upload/lab-file-upload-web-shell-upload-via-path-traversal)
     1. 透過 Burp Suite 修改 `filename` 參數，改為 `../test.php` 後，發現回應顯示 `The file avatars/test.php has been uploaded.`，表示 `/` 被忽略了，所以將 `/` 改為 `%2f` 後，就回應檔案已上傳到 `avatars/../test.php`。
     2. 將網址後方改為 `/files/test.php`，就得到密碼了！
 
@@ -78,7 +78,7 @@ Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net
 
 ### 覆蓋伺服器配置檔
 
-- **Lab: Web shell upload via extension blacklist bypass**
+- [**Lab: Web shell upload via extension blacklist bypass**](https://portswigger.net/web-security/file-upload/lab-file-upload-web-shell-upload-via-extension-blacklist-bypass)
     1. 若直接上傳 `.php` 檔，會回應伺服器不支援 `.php` 檔。
     2. 透過 Burp Suite 修改封包，讓請求傳送一個 `.htaccess` 檔，內容是：`AddType application/x-httpd-php .shell`，設定伺服器允許 `.shell` 的檔案。
     3. 上傳一個 `[test.shell](http://test.shell)`，內容為 PHP 語法，即可任意輸入 PHP 指令。
@@ -93,7 +93,7 @@ Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net
 3. 增加最後的字元，例如：空格、點等（`exploit.php.`）
 4. 使用 URL 編碼，例如：`exploit%2Ephp`。
 5. 使用 URL 中的分號或空位元組（%00），例如：`exploit.asp;.jpg` 或 `exploit.asp%00.jpg`。
-- **Lab: Web shell upload via obfuscated file extension**
+- [**Lab: Web shell upload via obfuscated file extension**](https://portswigger.net/web-security/file-upload/lab-file-upload-web-shell-upload-via-obfuscated-file-extension)
     1. 利用上方的方法一一嘗試後，發現第五種方法可行
     2. 修改檔名為 `test.php%00.jpg`。
     3. 上傳完後，將網址後方修改為：`/files/test.php`，就得到答案了～
@@ -104,7 +104,7 @@ Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net
 
 但仍然可使用特殊工具（如 ExifTool）製作惡意程式碼的 JPEG 檔。
 
-- **Lab: Remote code execution via polyglot web shell upload**
+- [**Lab: Remote code execution via polyglot web shell upload**](https://portswigger.net/web-security/file-upload/lab-file-upload-remote-code-execution-via-polyglot-web-shell-upload)
     1. 上傳 `test.php` 後發現，回應說只能上傳圖片檔。
     2. 使用 exiftool 工具將任一照片的 coment 值設成：`exiftool -comment="<?php echo 'Hello world '; passthru('cat /home/carlos/secret'); echo ' this is the end';?>" {file_path}`。
     3. 將修改後的照片檔副檔名修改成 `.php` 並上傳。
@@ -116,7 +116,7 @@ Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net
 
 競爭條件就是在判斷是否有危害程式的時候，立即抓去檔案下來。這種方式必須使用程式來執行，或透過 Turp Intruder 等工具，在短時間內上傳檔案並下載檔案。
 
-- **Lab: Web shell upload via race condition**
+- [**Lab: Web shell upload via race condition**](https://portswigger.net/web-security/file-upload/lab-file-upload-web-shell-upload-via-race-condition)
     1. 上傳一張照片，並打開照片。
     2. 上傳一個 `test.php` 檔，回應顯示只能上傳照片檔。
     3. 使用 Turp Intruder，貼上這段程式：
