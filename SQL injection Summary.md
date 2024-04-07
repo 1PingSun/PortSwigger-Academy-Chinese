@@ -1,5 +1,11 @@
 # SQL injection Summary
 
+By: 孫逸平
+
+Link: [https://portswigger.net/web-security/sql-injection](https://portswigger.net/web-security/sql-injection)
+
+---
+
 ## 什麼是 SQL injection (SQLi)？
 
 攻擊者可以透過 SQL injection 在資料庫中，取得、修改、刪除一些不被允許存取的資料，例如：其他用戶的資料。
