@@ -71,7 +71,7 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
 因為 `1=1` 一直都會是真（true），所以會回傳整個資料表的值。
 
 * [**Lab: SQL injection vulnerability in WHERE clause allowing retrieval of hidden data**](https://portswigger.net/web-security/sql-injection/lab-retrieve-hidden-data)
-  1. 點擊 Gift 選項，觀察網址後方為：`?category=Gifts`
+  1. 點擊 Gift 選項，觀察網址後方為：`?category=Gifts`。
   2. 為了符合題意：「取得所有未發布的品項」，可以將網址 `category=Gifts%27%20OR%201=1%20--`，通常瀏覽器會自動做 URL 編碼，所以改成 `category=Gifts' OR 1=1 --` 也可以。
   3. 修改完並重新整理後，就過關了！
 
@@ -88,3 +88,10 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
 ```SELECT * FROM users WHERE username = 'administrator'--' AND password = ''```
 
 就可以繞過密碼驗證，直接登入使用者名稱為 `administrator` 的帳號。
+
+* [**Lab: SQL injection vulnerability allowing login bypass**](https://portswigger.net/web-security/sql-injection/lab-login-bypass)
+  1. 點擊 `My account` 進入登入畫面。
+  2. 在使用者名稱欄位輸入 `administrator'--` 並點擊登入。
+  3. 發現頁面要求填寫密碼欄位。
+  4. 在密碼欄位隨意輸入任何值。
+  5. 點擊登入，就過關了！
