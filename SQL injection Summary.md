@@ -41,6 +41,7 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
 * Blind SQL injection：控制查詢結果，但不會回傳數據。
 
 ## 取得隱藏的資料
+
 假設一個購物網站，使用者點擊了 `Gift` 品項，網址就會變成：
 
 ```https://insecure-website.com/products?category=Gifts```
@@ -74,7 +75,16 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
   2. 為了符合題意：「取得所有未發布的品項」，可以將網址 `category=Gifts%27%20OR%201=1%20--`，通常瀏覽器會自動做 URL 編碼，所以改成 `category=Gifts' OR 1=1 --` 也可以。
   3. 修改完並重新整理後，就過關了！
 
-  
-  
+## 破壞應用程式邏輯
 
+想像一個登入介面，使用者輸入使用者名稱（username）`wiener`，以及密碼（password）`bluecheese`，則 SQL 語句為：
 
+```SELECT * FROM users WHERE username = 'wiener' AND password = 'bluecheese'```
+
+如果 SQL 語句回傳使用者的詳細資訊，則登入成功。
+
+攻擊者可透過 SQL 的註解語法 `--` 繞過密碼的確認。例如：在使用者名稱的欄位輸入 `administrator'--`，然後在密碼的欄位留白，使 SQL 語句變成：
+
+```SELECT * FROM users WHERE username = 'administrator'--' AND password = ''```
+
+就可以繞過密碼驗證，直接登入使用者名稱為 `administrator` 的帳號。
