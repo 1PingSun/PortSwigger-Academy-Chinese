@@ -95,3 +95,17 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
   3. 發現頁面要求填寫密碼欄位。
   4. 在密碼欄位隨意輸入任何值。
   5. 點擊登入，就過關了！
+
+## 抓取其他資料表的資料
+
+`UNION` 指令可以用來組合 SQL 語句，攻擊者就能利用組合新的指令取得其他資料表的資訊。
+
+舉例，當使用者輸入 `Gift` 後，SQL 語句會變成：
+
+```SELECT name, description FROM products WHERE category = 'Gifts'```
+
+攻擊者可以輸入：
+
+```' UNION SELECT username, password FROM users--```
+
+網站就會回傳所有使用者的帳號密碼。
