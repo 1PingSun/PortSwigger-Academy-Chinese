@@ -109,3 +109,15 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
 ```' UNION SELECT username, password FROM users--```
 
 網站就會回傳所有使用者的帳號密碼。
+
+了解更多：[SQL injection UNION attacks](https://portswigger.net/web-security/sql-injection/union-attacks)
+
+## 盲目的 SQL 注入漏洞
+
+許多的 SQL 注入實例都是盲目的漏洞，網站不會回傳 SQL 的查詢結果或其他錯誤訊息，但仍然可以取得未授權的資料，但涉及的技術複雜。
+
+* 可以更改查詢語句的邏輯，讓查詢出現差異。可加入一些布林邏輯，或觸法錯誤，例如：除以 0。
+* 可以透過時間延遲判斷條件是否被執行。
+
+了解更多：[Blind SQL injection](https://portswigger.net/web-security/sql-injection/blind)
+
