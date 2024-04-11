@@ -121,3 +121,8 @@ SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密
 
 了解更多：[Blind SQL injection](https://portswigger.net/web-security/sql-injection/blind)
 
+## 二階 SQL 注入
+
+一階 SQL 注入是將攻擊者的 HTTP 請求內容合併到 SQL 語句中，以進行 SQL 注入。
+
+二階 SQL 注入是攻擊者將 HTTP 請求的內容儲存進 SQL 資料庫中，在儲存資料時不會進行攻擊，之後再透過其他 HTTP 請求，取得資料庫的資料，因此二階 SQL 注入也被稱為儲存 SQL 注入。
