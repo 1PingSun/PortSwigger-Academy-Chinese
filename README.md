@@ -10,4 +10,4 @@ Link: <https://portswigger.net/web-security/all-topics> 
 
 - [檔案上傳漏洞重點整理](File%20Upload%20Vulnerabilities%20Summary.md)（Done）
 - [SQL 注入攻擊重點整理](SQL%20injection%20Summary.md)（In Progress）
-- [XSS 重點整理](Cross-site%20scripting%20Summary.md)（In Progress）
+- [跨網站腳本攻擊（XSS）重點整理](Cross-site%20scripting%20Summary.md)（In Progress）
