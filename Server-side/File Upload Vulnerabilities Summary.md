@@ -1,4 +1,4 @@
-# File Upload Vulnerabilities Summary
+# 任意檔案上傳漏洞（File Upload Vulnerabilities）
 
 By: 孫逸平
 
