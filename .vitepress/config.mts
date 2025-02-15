@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: "/",
+  base: "/PortSwigger-Academy-Chinese/",
   title: "PortSwigger Academy 翻譯",
   description: "嘗試翻譯 PortSwigger Academy 上的文章中...",
   themeConfig: {
