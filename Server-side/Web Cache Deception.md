@@ -83,4 +83,28 @@ Ref: [https://portswigger.net/web-security/web-cache-deception](https://portswig
 
 如果你發現兩相同請求的回應時間有巨大差異，有可能表示較快的回應來自快取。
 
+## 利用靜態檔副檔名快取規則
 
+快取規則經常透過檔案副檔名（包含：`.css`、`.js` 等），判斷靜態資源，這也是 CDNs 中最常見的行為。
+
+如果快取和原始伺服器解析 URL 的方式不一致，或使用分隔符號，攻擊者有機會能夠製作一個動態資源的請求並使用靜態資源的副檔名，讓原始伺服器不會理會，但快取會解析。
+
+### 路徑解析不一致
+
+URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包含：檔案、腳本、執行指令等。他們有可能使用不同的框架或技術，導致解析方式不同，兩個常見的傳統 URL 轉換和 RESTful URL 轉換。
+
+傳統 URL 轉換會將路徑轉換成系統上的檔案，這裡有一個典型的範例：`http://example.com/path/in/filesystem/resource.html`
+
+* `http://example.com` 指向伺服器。
+* `/path/in/fiflesystem` 描述伺服器檔案系統的資料夾路徑。
+* `resource.html` 指定存取的檔案。
+
+相較之下，REST-style 的 URL 不會直接對應實體的檔案結構，他們將檔案路徑抽象化為 API 的邏輯部分：`http://example.com/path/resource/param1/param2`
+
+* `http://example.com` 指向伺服器。
+* `/path/resource/` 是一個端點描述資源。
+* `param1` 和 `param2` 是提供伺服器處理請求使用的路徑參數。
+
+快取和原始伺服器將 URL 路徑對應資源的方式不同，可能造成網頁快取詐欺漏洞。考慮以下範例：`http://example.com/user/123/profile/wcd.css`
+
+* 
