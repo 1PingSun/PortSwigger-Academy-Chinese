@@ -4,8 +4,6 @@ By: 孫逸平
 
 Link: [https://portswigger.net/web-security/file-upload](https://portswigger.net/web-security/file-upload)
 
----
-
 ## 什麼是「上傳檔案漏洞」？
 
 指一個網頁開放上傳檔案，但卻沒有對檔案設定檔名、類型、內容、大小等的限制，攻擊者就可以透過上傳檔案，進行惡意程式碼的注入，或是看到網頁中的內部重要文件。
