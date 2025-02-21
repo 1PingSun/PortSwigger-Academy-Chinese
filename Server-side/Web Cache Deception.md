@@ -107,4 +107,38 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 快取和原始伺服器將 URL 路徑對應資源的方式不同，可能造成網頁快取詐欺漏洞。考慮以下範例：`http://example.com/user/123/profile/wcd.css`
 
-* 
+* 原始伺服器使用 REST-sytle URL 轉換會解釋這是一個端點 `/user/123/profile` 的請求，並回傳使用者 `123` 的個人資料資訊，而不會處理沒有意義的參數 `wcd.css`。
+* 快取伺服器使用傳統的 URL 轉換，會解釋成請求位於路徑 `/user/123/profile` 的檔案 `wcd.css`。如果快取的配置設定會儲存路徑結尾為 `.css` 的回應資料，它就會把個人資料當作 CSS 檔儲存在快取。
+
+### 利用路徑解析不一致
+
+為了測試原始伺服器如何將 URL 路徑轉換資源，可以在目標路徑後面加上一些隨意的部分路徑。如果都回應與原始請求相同的敏感資料，那表示原始伺服器並非只是使用傳統方式解析 URL 路徑，而是會忽略後面部分。例如，這個例子將 `/api/orders/123` 修改成 `/api/orders/123/foo` 仍然回傳相同資訊。
+
+為了測試快取如何轉換 URL 路徑，你需要嘗試將路徑加上靜態副檔名，以符合快取規則。例如：將 `/api/orders/123/foo` 修改成 `/api/orders/123/foo.js`。如果回應資料被快取儲存，這表示：
+
+* 快取把它當成靜態資源。
+* 快取規則會儲存請求結尾為 `.js` 的回應。
+
+快取有很多的基本規則是判斷特定的副檔名，可嘗試其他副檔名，包含：`.css`、`.ico` 以及 `.exe`。
+
+接著你可以製作回應儲存在快取的動態資源 URL。注意：這個攻擊有限制的特定結尾，原始伺服器通常有其他不同的規則處理不同的結尾。
+
+> [!note]
+> Burp Scanner 自動偵測路徑解析不同造成的網頁快取詐欺漏洞，也可以使用 [Web Cache Deception Scanner](https://portswigger.net/bappstore/7c1ca94a61474d9e897d307c858d52f0) BApp 偵測錯誤配置的網頁快取。
+
+* **Lab: Exploiting path mapping for web cache deception**
+  1. 偵查目標
+     1. 使用帳號 `wiener`、密碼 `peter` 登入。
+     2. 發現回應包含 API key
+  2. 辨識路徑解析不一致
+     1. 發送 `/my-account/abc` 路徑的請求，發現回應資料仍然包含你的 API Key，表示原始伺服器將其解析成 `/my-account`。
+     2. 在 URL 路徑加上副檔名，例如：`/my-account/abc.js`，接著發送請求。發現回應包含 `X-Cache: miss`（表示回應不是從快取提供）和 `Cache-Control: max-age=30`（表示會被儲存 30 秒）表頭。
+     3. 在 30 秒內重新傳送請求，發現表頭 `X-Cache` 的數字變成 `hit`，表示回應資料來自快取。由此可以推斷快取解釋 URL 路徑為 `/my-account/abc.js` 並符合 `.js` 副檔名的快取規則。所以可以使用這個 payload 進行利用。
+  3. 進行漏洞利用
+     1. 在網站中點擊 **Go to exploit server**
+     2. 在 **Body** 部分讓受害者（`carlos`）跳轉到你製作的惡意 URL。需注意應修改路徑後方的參數，以避免受害者存取到你之前存取的快取回應。
+      ```
+      <script>document.location="https://YOUR-LAB-ID.web-security-academy.net/my-account/wcd.js"</script>
+      ```
+     3. 點擊 **Deliver exploit to victim**。當受害者存取該 URL，回應會儲存在快取。
+     4. 前往提供給受害者（`carlos`）存取的路徑（`https://YOUR-LAB-ID.web-security-academy.net/my-account/wcd.js`），就可以看到 `carlos` 的 API Key 了。
