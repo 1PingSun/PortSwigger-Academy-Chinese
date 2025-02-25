@@ -142,3 +142,7 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
       ```
      3. 點擊 **Deliver exploit to victim**。當受害者存取該 URL，回應會儲存在快取。
      4. 前往提供給受害者（`carlos`）存取的路徑（`https://YOUR-LAB-ID.web-security-academy.net/my-account/wcd.js`），就可以看到 `carlos` 的 API Key 了。
+
+### 分隔號不一致
+
+分隔符號能夠將 URL 區分成不同物件，通常是一個標準化的資源或字串，例如：
