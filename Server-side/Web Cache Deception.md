@@ -126,7 +126,7 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 > [!note]
 > Burp Scanner 自動偵測路徑解析不同造成的網頁快取詐欺漏洞，也可以使用 [Web Cache Deception Scanner](https://portswigger.net/bappstore/7c1ca94a61474d9e897d307c858d52f0) BApp 偵測錯誤配置的網頁快取。
 
-* **Lab: Exploiting path mapping for web cache deception**
+* **Lab: [Exploiting path mapping for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-path-mapping)**
   1. 偵查目標
      1. 使用帳號 `wiener`、密碼 `peter` 登入。
      2. 發現回應包含 API key
@@ -164,3 +164,11 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 * 其他常見的框架遇到 `%00` 在 URL 中時，會回應錯誤。然而如果快取使用 Akamai on Fastly，就會解析路徑中 `%00` 和後面的所有東西。
 
 ### 利用分隔方式不一致
+
+你可以利用分隔不一致，在路徑中加入快取會解析但原始伺服器不會的靜態副檔名。若要利用分隔不一致，需要確認分隔字元被原始伺服器解析成分隔符號，但快取不會解析的。
+
+首先，找到被原始伺服器當作分隔符號的資源。一開始可以加上任意的字串到目標 URL，例如：將 `/setting/users/list` 修改成 `/settings/users/listaaa`。當你開始測試分隔字元時，將使用回應作為參考。
+
+> [!note]
+> 如果回應資料和原始回應相同，表示請求被轉向了，你需要選擇其他不同的端點作為測試。
+
