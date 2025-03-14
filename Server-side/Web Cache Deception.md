@@ -172,3 +172,28 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 > [!note]
 > 如果回應資料和原始回應相同，表示請求被轉向了，你需要選擇其他不同的端點作為測試。
 
+接著，在原始路徑和任意的字串間加上可能的分隔符號，例如 `/settings/users/list;aaa`：
+
+* 如果回應與原始請求的回應相同，表示字元 `;` 被當作分隔符號，且原始伺服器將其解釋為路徑 `/settings/users/list`。
+* 如果回應與任意字串相符，表示字元 `;` 沒有被當作分隔符號，且原始伺服器將其解析為 `/settings/users/list;aaa`。
+
+一旦你找到被原始伺服器當作分隔符號的字元，就要測試這個字元是否也被快取伺服器作為分隔符號。要做到這件事，在路徑結尾加上靜態副檔名。如果回應被快取儲存表示：
+
+* 快取不使用分隔符號，而是使用靜態副檔名解析完整的 URL 路徑。
+* 快取規則會儲存結尾為 `.js` 的請求回應。
+
+確保測試所有的 ASCII 字元以及一些常見的副檔名，包含 `.css`、`.ico` 和 `.exe` 等。這裡有一個常見分隔符號字元的清單 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list)。使用 Burp Intruder 快速測試這些字元，為了避免 Burp Intruder 自動編碼分隔字元，要在 **Payloads** 側邊欄中的 **Payload encoding** 下，關閉「Burp Intruder's automated character encoding」。
+
+你可以創建一個出發靜態副檔名快取規則的漏洞利用。例如，payload `/settings/users/list;aaa.js`，原始伺服器使用 `;` 作為分隔符號：
+
+* 快取解析路徑為 `/settings/users/list;aaa.js`。
+* 原始伺服器解析路徑為 `/settings/users/list`。
+
+原始伺服器回傳被快取儲存的動態個人資料資訊。
+
+由於分隔符號在每個伺服器通常使用一樣，你可以在各種不同的端點使用此攻擊。
+
+> [!note]
+> 在瀏覽器向快取請求前，有寫分隔字元會先被受害者的瀏覽器處理。這表示有寫分隔符號無法被拿來進行攻擊利用。例如，瀏覽器獎 `{`、`}`、`<`、`<`、`#` 等字元編碼以分割路徑。
+> 如果快取或原始伺服器將這些字元解碼，在漏洞利用時可能會使用編碼的版本。
+
