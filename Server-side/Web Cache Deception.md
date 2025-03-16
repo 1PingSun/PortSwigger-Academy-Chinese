@@ -194,6 +194,36 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 由於分隔符號在每個伺服器通常使用一樣，你可以在各種不同的端點使用此攻擊。
 
 > [!note]
+> 
 > 在瀏覽器向快取請求前，有寫分隔字元會先被受害者的瀏覽器處理。這表示有寫分隔符號無法被拿來進行攻擊利用。例如，瀏覽器獎 `{`、`}`、`<`、`<`、`#` 等字元編碼以分割路徑。
+> 
 > 如果快取或原始伺服器將這些字元解碼，在漏洞利用時可能會使用編碼的版本。
 
+* **Lab: [Exploiting path delimiters for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-path-delimiters)**
+   1. 偵查：使用 Burp Intruder 嘗試不同分隔字元，判斷原始伺服器會解析哪些分隔符號
+      1. 將請求傳送到 Intruder
+      2. 加上參數
+         ![](https://i.imgur.com/5fC2ACc.png)
+      3. 將 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list) 中的字元貼上到 payload 的地方
+      4. 取消勾選 URL-encode these characters 選項
+      5. 點擊 Start attack 完成攻擊後，會發現只有字元 `?` 和 `;` 回應 200，其他都是 404
+   2. 偵查：判斷是否會被快取儲存
+      1. 使用 `?` 字元作為分隔符號會發現 header 沒有快取的痕跡
+         ![](https://i.imgur.com/ODpYO8i.jpeg)
+      2. 使用 `;` 字元作為分隔符號連續請求兩次，發現 header 有被快取儲存的跡象
+         ![](https://i.imgur.com/eMDME6l.jpeg)
+         ![](https://i.imgur.com/GPkMfy8.jpeg)
+   3. 漏洞利用
+      1. 在 Go to exploit server 的 body 撰寫 payload
+         ```
+         <script>document.location="https://YOUR-LAB-ID.web-security-academy.net/my-account;wcd.js"</script>
+         ```
+      2. 接著前往路徑 `https://YOUR-LAB-ID.web-security-academy.net/my-account;wcd.js` 就可以拿到受害者的 API key 了！
+
+### 分隔資源解碼不一致
+
+網頁有時候需要在包含一些特殊意義字元的 URL 傳送資料，例如：分隔符號。為了確保這些字元被解析為數據，通常都會編碼。然而，有些語法會在處理 URL 前，解碼有把握的字元。如果分隔字元被解碼，他會被當作分隔符號切段 URL 路徑。
+
+快取和來源伺服器對分隔符號的解碼方式不同，就算都使用相同的字元作為分隔符號，也會造成它們對 URL 路徑的解析出現差異。例如 `/profile%23wcd.css` 使用 URL-encoded 字元 `#`：
+
+* 
