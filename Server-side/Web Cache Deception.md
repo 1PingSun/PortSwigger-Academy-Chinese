@@ -399,3 +399,10 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
       ```
    4. 使用 **Repeater** 將原本的 `/my-account` 請求修改成路徑 `/my-account;%2f%2e%2e%2frobots.txt?wcd` 並發送請求
    5. 將回應被快取的 administrator 使用者個人資料頁面，並在當中找到 csrf 值
+
+## 防範網頁快取詐欺漏洞
+
+* 總是使用 `Cache-Control` 表頭標註動態資源，將其設為 `no-store`、`private`
+* 設定 CDN 配置，避免快取規則覆蓋 `Cache-Control` 表頭
+* 將所有 CDN 針對網頁快取詐欺攻擊的保護開啟，許多 CDN 可以自己設定快取規則，以驗證回應的 `Content-Type` 是否與請求的 URL 檔案副檔名匹配，例如：Cloudflare 的 Cache Deception Armor
+* 確保原始伺服器和快取伺服器在解析 URL 路徑上沒有任何不一致
