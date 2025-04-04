@@ -22,7 +22,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/1PingSun/PortSwigger-Summary-Chinese' }
+      { icon: 'github', link: 'https://github.com/1PingSun/PortSwigger-Academy-Chinese' }
     ]
   }
 })
