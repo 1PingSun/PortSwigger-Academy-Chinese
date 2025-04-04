@@ -16,7 +16,8 @@ export default defineConfig({
         text: 'Server-side topics',
         items: [
           { text: '任意檔案上傳漏洞（File Upload Vulnerabilities）', link: '/Server-side/File Upload Vulnerabilities Summary' },
-          { text: '網頁快取詐欺（Web Cache Deception）', link: '/Server-side/Web Cache Deception' }
+          { text: '網頁快取詐欺（Web Cache Deception）', link: '/Server-side/Web Cache Deception' },
+          { text: '路徑遍歷（Path traversal）', link: '/Server-side/Path traversal' }
         ]
       }
     ],

@@ -15,10 +15,11 @@ hero:
 
 features:
   - title: 翻譯中...
-    details: 路徑遍歷（Path traversal）
+    details: 
   - title: 已完成
-    details: |
-      任意檔案上傳漏洞（File Upload Vulnerabilities）
-      網頁快取詐欺（Web Cache Deception）
+    details: "
+      任意檔案上傳漏洞（File Upload Vulnerabilities）<br/>
+      網頁快取詐欺（Web Cache Deception）<br />
+      路徑遍歷（Path traversal）"
 ---
 
