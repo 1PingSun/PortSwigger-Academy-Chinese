@@ -15,10 +15,9 @@ hero:
 
 features:
   - title: 翻譯中...
-    details: XSS 跨網站指令碼
-  - title: 翻譯中...
-    details: SQL Injection
-  - title: 翻譯中...
-    details: Web Cache Deception
+    details: 路徑遍歷（Path traversal）
+  - title: 已完成
+    details: 任意檔案上傳漏洞（File Upload Vulnerabilities）|
+    網頁快取詐欺（Web Cache Deception）
 ---
 
