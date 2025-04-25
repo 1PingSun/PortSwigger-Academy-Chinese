@@ -1,4 +1,4 @@
-# 路徑遍歷（Path traversal）
+# 路徑遍歷（Path Traversal）
 
 By: 孫逸平
 

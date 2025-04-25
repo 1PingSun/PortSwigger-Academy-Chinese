@@ -1,4 +1,4 @@
-# SQL injection Summary
+# SQL Injection Summary
 
 By: 孫逸平
 
