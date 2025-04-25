@@ -15,11 +15,12 @@ hero:
 
 features:
   - title: 翻譯中...
-    details: 
+    details: 身分驗證漏洞（Authentication Vulnerabilities）
   - title: 已完成
     details: "
       任意檔案上傳漏洞（File Upload Vulnerabilities）<br/>
       網頁快取詐欺（Web Cache Deception）<br />
-      路徑遍歷（Path traversal）"
+      路徑遍歷（Path traversal）<br />
+      指令注入（OS command injection）"
 ---
 

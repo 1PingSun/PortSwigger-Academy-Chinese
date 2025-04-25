@@ -1,5 +1,11 @@
 # 身分驗證漏洞（Authentication Vulnerabilities）
 
+By: 孫逸平
+
+Ref: [https://portswigger.net/web-security/authentication](https://portswigger.net/web-security/authentication)
+
+---
+
 從概念上，身分驗證漏洞很好理解。但因為身分驗證和安全性直接存在明確的關係，因此相當重要。
 
 身分驗證漏洞允許攻擊者取得敏感資料或敏感功能的權限。他們還公開了額外的攻擊面供利用，因此了解如何辨識和利用身分認證漏洞，並學習如何繞過常見的保護機制相當重要。

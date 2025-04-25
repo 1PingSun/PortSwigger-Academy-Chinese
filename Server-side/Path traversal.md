@@ -14,6 +14,8 @@ Ref: [https://portswigger.net/web-security/file-path-traversal](https://portswig
 
 ![](src/image3.png)
 
+圖片來源：[https://portswigger.net/web-security/file-path-traversal](https://portswigger.net/web-security/file-path-traversal)
+
 ## 什麼是路徑遍歷
 
 路徑遍歷 Path traversal 也被稱為 directory traversal，這個漏洞允許攻擊讀取執行中應用的伺服器上的任意檔案。這可能包含：

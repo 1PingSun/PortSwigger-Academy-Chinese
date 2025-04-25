@@ -10,7 +10,7 @@ Ref: [https://portswigger.net/web-security/web-cache-deception](https://portswig
 
 ![alt](src/image.png)
 
-圖片來源：[https://portswigger.net/web-security/web-cache-deception/images/wcd-image-1.png](https://portswigger.net/web-security/web-cache-deception/images/wcd-image-1.png)
+圖片來源：[https://portswigger.net/web-security/web-cache-deception](https://portswigger.net/web-security/web-cache-deception)
 
 > [!Note]
 >
