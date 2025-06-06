@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Server-side topics
-      link: /Server-side/File Upload Vulnerabilities Summary
+      link: /Server-side/File Upload Vulnerabilities
     - theme: alt
       text: Client-side topics
       link: /Client-side/Cross-site scripting Summary
