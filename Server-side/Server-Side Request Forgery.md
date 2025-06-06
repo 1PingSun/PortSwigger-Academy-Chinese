@@ -225,3 +225,36 @@ stockApi=http://weliketoshop.net/product/nextProduct?currentProductId=6&path=htt
         ```
         stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin/delete?username=carlos
         ```
+
+## 盲目 SSRF 漏洞
+
+盲目 SSRF 漏洞發生在當你能夠讓應用程式向提供的 URL 發送後端 HTTP 請求時，但後端請求的回應並不會在應用程式的前端回應中返回。
+
+盲目 SSRF 比較難以利用，但有時會導致伺服器或其他後端組件的完全遠端代碼執行。
+
+### 了解更多
+
+* [Finding and exploiting blind SSRF vulnerabilities](https://portswigger.net/web-security/ssrf/blind)
+
+## 發現 SSRF 漏洞的隱藏攻擊面
+
+許多伺服器端請求偽造漏洞很容易發現，因為應用程式的正常流量涉及包含完整 URL 的請求參數。其他的 SSRF 實例則較難定位。
+
+### 請求中的部分 URL
+
+有時，應用程式只將主機名稱或 URL 路徑的一部分放入請求參數中。提交的值接著會在伺服器端被整合到一個完整的 URL 中並被請求。如果該值很容易被識別為主機名稱或 URL 路徑，潛在的攻擊面可能是顯而易見的。然而，作為完整 SSRF 的可利用性可能受到限制，因為你無法控制被請求的整個 URL。
+
+### 資料格式中的 URL
+
+某些應用程式以包含規範的格式傳輸資料，該規範允許包含可能被格式的資料解析器請求的 URL。這方面一個明顯的例子是 XML 資料格式，它在網路應用程式中被廣泛用於從客戶端向伺服器傳輸結構化資料。當應用程式接受 XML 格式的資料並解析它時，可能容易受到 XXE 注入攻擊。它也可能透過 XXE 容易受到 SSRF 攻擊。當我們研究 XXE 注入漏洞時，我們將更詳細地涵蓋這一點。
+
+### 透過 Referer 標頭的 SSRF
+
+某些應用程式使用伺服器端分析軟體來追蹤訪客。這種軟體通常會記錄請求中的 Referer 標頭，以便追蹤傳入的連結。分析軟體經常會訪問出現在 Referer 標頭中的任何第三方 URL。這通常是為了分析引用網站的內容，包括傳入連結中使用的錨點文字。因此，Referer 標頭經常是 SSRF 漏洞的有用攻擊面。
+
+請參閱盲目 SSRF 漏洞，了解涉及 Referer 標頭的漏洞範例。
+
+#### 了解更多
+
+* [Cracking the lens: Targeting auxiliary systems](https://portswigger.net/blog/cracking-the-lens-targeting-https-hidden-attack-surface#aux)
+* [URL validation bypass cheat sheet](https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet)

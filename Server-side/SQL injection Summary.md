@@ -6,69 +6,98 @@ Link: [https://portswigger.net/web-security/sql-injection](https://portswigger.n
 
 ---
 
+在本節中，我們將說明：
+
+* 什麼是 SQL 注入攻擊（SQLi）。
+* 如何發現和利用不同類型的 SQLi 漏洞。
+* 如何防範 SQLi 攻擊。
+
 ## 什麼是 SQL injection (SQLi)？
 
-攻擊者可以透過 SQL injection 在資料庫中，取得、修改、刪除一些不被允許存取的資料，例如：其他用戶的資料。
+SQL 注入攻擊（SQLi）是一種網路安全漏洞，允許攻擊者干擾應用程式對其資料庫執行的查詢。這可能讓攻擊者檢視通常無法取得的資料，包括屬於其他使用者的資料，或應用程式能夠存取的任何其他資料。在許多情況下，攻擊者可以修改或刪除這些資料，對應用程式的內容或行為造成持續性的變更。
 
-## SQL injection 會造成什麼影響？
+在某些情況下，攻擊者可以將 SQL 注入攻擊升級，進而入侵底層伺服器或其他後端基礎設施。這也可能使他們能夠執行阻斷服務攻擊。
 
-SQL injection 可以讓攻擊者取得不被允許取得的資訊，包含：密碼、信用卡資料、個人資料等。
+<iframe width="560" height="315" src="https://www.youtube.com/embed/wX6tszfgYp4?si=cMSa7Qsa_ah97BLg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
-許多資料洩漏事件都是透過 SQL injection 攻擊的，這些都造成了聲譽的受損或罰款。攻擊者也可能進入系統長期入侵。
+## 成功的 SQL 注入攻擊會造成什麼影響？
+
+成功的 SQL 注入攻擊可能導致未經授權存取敏感資料，例如：
+
+* 密碼。
+* 信用卡詳細資訊。
+* 個人使用者資訊。
+
+多年來，SQL 注入攻擊已被用於許多備受矚目的資料外洩事件。這些攻擊造成了聲譽損害和監管罰款。在某些情況下，攻擊者可以在組織的系統中獲得持續性的後門，導致長期入侵，而這種入侵可能在很長一段時間內都不會被發現。
 
 ## 如何檢測 SQL injection 漏洞？
 
-可以透過以下方式手動檢測：
+您可以透過對應用程式中每個輸入點進行系統性測試來手動檢測 SQL 注入漏洞。要做到這一點，您通常需要提交：
 
-* 輸入單引號 `'` 並觀察是否有錯誤訊息或異常
-* 輸入布林條件，例如：`OR 1=1` 和 `OR 1=2`，並查看回應中的差異。
-* 檢查回應時間差異
+* 單引號字元 `'` 並尋找錯誤或其他異常現象。
+* 一些 SQL 特定語法，這些語法會評估為輸入點的基礎（原始）值，以及不同的值，並尋找應用程式回應中的系統性差異。
+* 布林條件，例如 `OR 1=1` 和 `OR 1=2`，並尋找應用程式回應中的差異。
+* 設計用於在 SQL 查詢中執行時觸發時間延遲的有效載荷，並尋找回應時間的差異。
+* OAST 有效載荷，設計用於在 SQL 查詢中執行時觸發帶外網路互動，並監控任何產生的互動。
 
-## SQL 的各種子句
+或者，您可以使用 Burp Scanner 快速且可靠地找到大部分的 SQL 注入漏洞。
 
-大多數的漏洞都發生在 `WHERE` 語法子句中，但 SQL injection 漏洞可能出現在任何指令，包含：
+## 查詢語句不同部分中的 SQL 注入
 
-* 在 `UPDATE` 語句中，有欲更新的值或 `WHERE` 子句指定的位置。
-* 在 `INSERT` 語句中，有欲插入的值。
-* 在 `SELECT` 語句中，有資料表的名稱或列名。
-* 在 `SELECT` 語句中，有 `ORDER BY` 子句。
+大多數 SQL 注入漏洞發生在 `SELECT` 查詢語句的 `WHERE` 子句中。大多數有經驗的測試人員都熟悉這種類型的 SQL 注入。
 
-## SQL injection 的範例
+然而，SQL 注入漏洞可能出現在查詢語句的任何位置，以及不同類型的查詢語句中。SQL 注入出現的其他一些常見位置包括：
 
-* 透過修改 SQL 語法，查詢資料庫中隱藏的數據，並回傳查詢後的值。
-* 更改內容，以干擾其邏輯。
-* UNION 攻擊，獲得其他資料表的數據。
-* Blind SQL injection：控制查詢結果，但不會回傳數據。
+* 在 `UPDATE` 語句中，位於更新值或 `WHERE` 子句內。
+* 在 `INSERT` 語句中，位於插入值內。
+* 在 `SELECT` 語句中，位於資料表或欄位名稱內。
+* 在 `SELECT` 語句中，位於 `ORDER BY` 子句內。
 
-## 取得隱藏的資料
+## SQL 注入範例
 
-假設一個購物網站，使用者點擊了 `Gift` 品項，網址就會變成：
+有許多 SQL 注入漏洞、攻擊和技術會在不同情況下發生。一些常見的 SQL 注入範例包括：
 
-```https://insecure-website.com/products?category=Gifts```
+* 擷取隱藏資料，您可以修改 SQL 查詢語句以返回額外的結果。
+* 破壞應用程式邏輯，您可以變更查詢語句來干擾應用程式的邏輯。
+* UNION 攻擊，您可以從不同的資料庫資料表中擷取資料。
+* 盲注 SQL 注入，您所控制的查詢語句結果不會在應用程式的回應中返回。
 
-此時的 SQL 語句為：
+## 擷取隱藏資料
 
-```SELECT * FROM products WHERE category = 'Gifts' AND released = 1```
+想像一個購物應用程式，它會在不同類別中顯示產品。當使用者點擊**禮品**類別時，他們的瀏覽器會請求以下 URL：
+`https://insecure-website.com/products?category=Gifts`
 
-其中的 `AND released = 1` 假設用意為只回傳上架的商品，避免隱藏的商品被回傳，並假設隱藏的商品的 `released` 值為 `0`。
+這會導致應用程式執行 SQL 查詢語句，從資料庫中擷取相關產品的詳細資訊：
+`SELECT * FROM products WHERE category = 'Gifts' AND released = 1`
 
-可以將網址改成：
+這個 SQL 查詢語句要求資料庫返回：
 
-```https://insecure-website.com/products?category=Gifts' --```
+* 所有詳細資訊（`*`）
+* 從 `products` 資料表
+* 其中 `category` 為 `Gifts`
+* 且 `released` 為 `1`。
 
-當中的 `--` 為 SQL 中的註解，可忽略之後的內容，
+限制條件 `released = 1` 被用來隱藏尚未發布的產品。我們可以假設對於未發布的產品，`released = 0`。
 
-因此後方的 `AND released = 1` 條件就會被忽略
+該應用程式沒有實作任何針對 SQL 注入攻擊的防護措施。這意味著攻擊者可以構造以下攻擊，例如：
+`https://insecure-website.com/products?category=Gifts'--`
 
-也可以將網址改成：
+這會產生以下 SQL 查詢語句：
+`SELECT * FROM products WHERE category = 'Gifts'--' AND released = 1`
 
-```https://insecure-website.com/products?category=Gifts'+OR+1=1--```
+重要的是，請注意 `--` 是 SQL 中的註解指示符。這意味著查詢語句的其餘部分會被解釋為註解，有效地將其移除。在這個範例中，這意味著查詢語句不再包含 `AND released = 1`。因此，所有產品都會被顯示，包括那些尚未發布的產品。
 
-此時的 SQL 語句就變成：
+您可以使用類似的攻擊來使應用程式顯示任何類別中的所有產品，包括他們不知道的類別：
+`https://insecure-website.com/products?category=Gifts'+OR+1=1--`
 
-```SELECT * FROM products WHERE category = 'Gifts' OR 1=1--' AND released = 1```
+這會產生以下 SQL 查詢語句：
+`SELECT * FROM products WHERE category = 'Gifts' OR 1=1--' AND released = 1`
 
-因為 `1=1` 一直都會是真（true），所以會回傳整個資料表的值。
+修改後的查詢語句會返回所有 `category` 為 `Gifts` 或 `1` 等於 `1` 的項目。由於 `1=1` 永遠為真，查詢語句會返回所有項目。
+
+> [!warning]
+> 
+> 在 SQL 查詢語句中注入條件 `OR 1=1` 時請小心。即使在您注入的語境中看起來無害，應用程式通常會在多個不同的查詢語句中使用來自單一請求的資料。例如，如果您的條件到達 `UPDATE` 或 `DELETE` 語句，可能會導致意外的資料遺失。
 
 * [**Lab: SQL injection vulnerability in WHERE clause allowing retrieval of hidden data**](https://portswigger.net/web-security/sql-injection/lab-retrieve-hidden-data)
   1. 點擊 Gift 選項，觀察網址後方為：`?category=Gifts`。
