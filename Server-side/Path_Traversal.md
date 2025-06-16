@@ -32,31 +32,31 @@ Ref: [https://portswigger.net/web-security/file-path-traversal](https://portswig
 
 想像有一個購物應用，顯示商品的照片，這會透過以下的 HTML 載入圖片：
 
-```
+```html
 <img src="/loadImage?filename=218.png">
 ```
 
 `loadImage` URL 帶有一個 `filename` 參數，且會回傳指定檔案的內容。圖片檔案被儲存在伺服器的 `/var/www/images/` 路徑。為了能夠回傳圖片，應用會將請求的檔案名稱加到基礎資料夾後方，接著透過檔案系統 API 讀取檔案。換句話說，應用會讀取以下路徑：
 
-```
+```raw
 /var/www/images/218.png
 ```
 
 這個應用沒有針對路徑遍歷攻擊進行任何的防禦，最後造成攻擊者可以透過以下 URL 讀取伺服器檔案系統上的 `/etc/passwd` 檔案：
 
-```
+```raw
 https://insecure-website.com/loadImage?filename=../../../etc/passwd
 ```
 
 這是因為應用會讀取以下檔案路徑：
 
-```
+```raw
 /var/www/images/../../../etc/passwd
 ```
 
 `../` 在檔案路徑中是有效的片段，代表在資料夾架構中向上一層。連續三個 `../` 將路徑 `/var/www/images/` 依序向上到根目錄，所以實際讀取的檔案是：
 
-```
+```raw
 /etc/passwd
 ```
 
@@ -64,15 +64,16 @@ https://insecure-website.com/loadImage?filename=../../../etc/passwd
 
 在 Windows 作業系統中，`../` 和 `..\` 都是有效的資料夾遍歷片段，以下是基於 Windows 伺服器相同效果的攻擊範例：
 
-```
+```raw
 https://insecure-website.com/loadImage?filename=..\..\..\windows\win.ini
 ```
 
-* **Lab: [File path traversal, simple case](https://portswigger.net/web-security/file-path-traversal/lab-simple)**
-  1. 打開後看到多張圖片
-  2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
-  3. 發現路徑為 `/image?filename=34.jpg`
-  4. 嘗試將路徑改為 `../../../etc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+::: tip **Lab: [File path traversal, simple case](https://portswigger.net/web-security/file-path-traversal/lab-simple)**
+1. 打開後看到多張圖片
+2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
+3. 發現路徑為 `/image?filename=34.jpg`
+4. 嘗試將路徑改為 `../../../etc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+:::
 
 ## 路徑遍歷漏洞利用的常見阻擋
 
@@ -82,45 +83,50 @@ https://insecure-website.com/loadImage?filename=..\..\..\windows\win.ini
 
 你可以直接輸入檔案系統根目錄中的絕對位置，在無需任何遍歷片段的情況下直接存取檔案，例如：`filename=/etc/passwd`。
 
-* **Lab: [File path traversal, traversal sequences blocked with absolute path bypass](https://portswigger.net/web-security/file-path-traversal/lab-absolute-path-bypass)**
-   1. 打開後看到多張圖片
-   2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
-   3. 發現路徑為 `/image?filename=31.jpg`
-   4. 嘗試將路徑改為 `/etc/passwd`，即可存取該檔案並完成此 Lab
+::: tip **Lab: [File path traversal, traversal sequences blocked with absolute path bypass](https://portswigger.net/web-security/file-path-traversal/lab-absolute-path-bypass)**
+1. 打開後看到多張圖片
+2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
+3. 發現路徑為 `/image?filename=31.jpg`
+4. 嘗試將路徑改為 `/etc/passwd`，即可存取該檔案並完成此 Lab
+:::
 
 你也可以使用巢狀遍歷片段，例如：`....//` 或 `....\/`。當裡面的片段會被剝離的時候，可以恢復成簡單的路徑遍歷片段。
 
-* **Lab: [File path traversal, traversal sequences stripped non-recursively](https://portswigger.net/web-security/file-path-traversal/lab-sequences-stripped-non-recursively)**
-   1. 打開後看到多張圖片
-   2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
-   3. 發現路徑為 `/image?filename=29.jpg`
-   4. 嘗試將路徑改為 `....//....//....//etc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+::: tip **Lab: [File path traversal, traversal sequences stripped non-recursively](https://portswigger.net/web-security/file-path-traversal/lab-sequences-stripped-non-recursively)**
+1. 打開後看到多張圖片
+2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
+3. 發現路徑為 `/image?filename=29.jpg`
+4. 嘗試將路徑改為 `....//....//....//etc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+:::
 
 在一些情況下，例如在 URL 路徑或 `multipart/form-data` 請求的 `filename` 參數中，網站伺服器會在傳送你的輸入到應用前，剝離任何的路徑遍歷片段。有時你可以透過 URL 編碼或雙重 URL 編碼 `../` 的字元繞過這類阻擋，編碼後分別為 `%2e%2e%2f` 以及 `%252e%252e%252f`。其他非標準的編碼也可能有效，例如 `..%c0%af` 或 `..%ef%bc%8f`。
 
 對於 Burp Suite 的 Professional 使用者，Burp Intruder 提供預先設定的 **Fuzzing - path traversal** 清單 Paylaod，其中包含一些可以嘗試的經過編碼的路徑遍歷參數。
 
-* **Lab: [File path traversal, traversal sequences stripped with superfluous URL-decode](https://portswigger.net/web-security/file-path-traversal/lab-superfluous-url-decode)**
-   1. 打開後看到多張圖片
-   2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
-   3. 發現路徑為 `/image?filename=31.jpg`
-   4. 嘗試將路徑改為 `%252e%252e%252f%252e%252e%252f%252e%252e%252fetc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+::: tip **Lab: [File path traversal, traversal sequences stripped with superfluous URL-decode](https://portswigger.net/web-security/file-path-traversal/lab-superfluous-url-decode)**
+1. 打開後看到多張圖片
+2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
+3. 發現路徑為 `/image?filename=31.jpg`
+4. 嘗試將路徑改為 `%252e%252e%252f%252e%252e%252f%252e%252e%252fetc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+:::
 
 應用可能要求使用者提供以預期的基礎資料夾路徑開頭的檔案名稱，例如：`/var/www/images`。在這個例子當中，有可能包含要求的基礎資料夾，並在後面加上適當的路徑遍歷片段，例如：`filename=/var/www/images/../../../etc/passwd`。
 
-* **Lab: [File path traversal, validation of start of path](https://portswigger.net/web-security/file-path-traversal/lab-validate-start-of-path)**
-   1. 打開後看到多張圖片
-   2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
-   3. 發現路徑為 `/image?filename=/var/www/images/22.jpg`
-   4. 嘗試將路徑改為 `/image?filename=/var/www/images/../../../etc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+::: tip **Lab: [File path traversal, validation of start of path](https://portswigger.net/web-security/file-path-traversal/lab-validate-start-of-path)**
+1. 打開後看到多張圖片
+2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
+3. 發現路徑為 `/image?filename=/var/www/images/22.jpg`
+4. 嘗試將路徑改為 `/image?filename=/var/www/images/../../../etc/passwd`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+:::
 
 應用可能要求使用者提供的檔案名稱結尾為預期的特定檔案副檔名，例如：`.png`。在這個情況中，有機會在要求的檔案副檔名前面透過無效的字節中斷檔案路徑，例如：`filename=../../../etc/passwd%00.png`。
 
-* **Lab: [File path traversal, validation of file extension with null byte bypass](https://portswigger.net/web-security/file-path-traversal/lab-validate-file-extension-null-byte-bypass)**
-   1. 打開後看到多張圖片
-   2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
-   3. 發現路徑為 `/image?filename=66.jpg`
-   4. 嘗試將路徑改為 `/image?filename=../../../etc/passwd%00.jpg`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+::: tip **Lab: [File path traversal, validation of file extension with null byte bypass](https://portswigger.net/web-security/file-path-traversal/lab-validate-file-extension-null-byte-bypass)**
+1. 打開後看到多張圖片
+2. 選擇任一圖片點擊右鍵 > 在新分頁中開啟
+3. 發現路徑為 `/image?filename=66.jpg`
+4. 嘗試將路徑改為 `/image?filename=../../../etc/passwd%00.jpg`，即可存取 `/etc/passwd` 檔案並完成此 Lab
+:::
 
 ## 防禦路徑遍歷漏洞
 
@@ -140,6 +146,7 @@ if (file.getCanonicalPath().startsWith(BASE_DIRECTORY)) {
 }
 ```
 
-## 了解更多
+::: info Read more
 
-[透過 Burp Suite 的網站漏洞掃描器找到路徑遍歷漏洞](https://portswigger.net/burp/vulnerability-scanner)
+* [透過 Burp Suite 的網站漏洞掃描器找到路徑遍歷漏洞](https://portswigger.net/burp/vulnerability-scanner)
+:::

