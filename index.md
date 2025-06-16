@@ -8,19 +8,19 @@ hero:
   actions:
     - theme: brand
       text: Server-side topics
-      link: /Server-side/File Upload Vulnerabilities
+      link: /Server-side/File_Upload_Vulnerabilities
     - theme: alt
       text: Client-side topics
-      link: /Client-side/Cross-site scripting Summary
+      link: /Client-side/Cross-Site_Scripting
 
-features:
-  - title: 翻譯中...
-    details: 身分驗證漏洞（Authentication Vulnerabilities）
-  - title: 已完成
-    details: "
-      任意檔案上傳漏洞（File Upload Vulnerabilities）<br/>
-      網頁快取詐欺（Web Cache Deception）<br />
-      路徑遍歷（Path traversal）<br />
-      指令注入（OS command injection）"
+# features:
+#   - title: 翻譯中...
+#     details: 身分驗證漏洞（Authentication Vulnerabilities）
+#   - title: 已完成
+#     details: "
+#       任意檔案上傳漏洞（File Upload Vulnerabilities）<br/>
+#       網頁快取詐欺（Web Cache Deception）<br />
+#       路徑遍歷（Path traversal）<br />
+#       指令注入（OS command injection）"
 ---
 
