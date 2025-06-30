@@ -21,10 +21,17 @@ export default defineConfig({
           { text: '指令注入（OS command injection）', link: '/Server-side/OS_Command_Injection' },
           { text: '任意檔案上傳漏洞（File Upload Vulnerabilities）', link: '/Server-side/File_Upload_Vulnerabilities' },
           { text: '伺服器端請求偽造（SSRF）', link: '/Server-side/Server-Side_Request_Forgery' },
+          { text: 'XXE（XXE Injection）', link: '/Server-side/XXE_Injection' },
           { text: 'API 測試（API Test）', link: '/Server-side/API_Test' },
           { text: '網頁快取詐欺（Web Cache Deception）', link: '/Server-side/Web_Cache_Deception' }
         ]
-      }
+      },
+      {
+        text: 'Advanced topics',
+        items: [
+          { text: 'HTTP 請求走私（HTTP Request Smuggling）', link: '/Advanced/HTTP_Request_Smuggling' },
+        ]
+      },
     ],
 
     socialLinks: [

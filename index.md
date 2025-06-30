@@ -12,6 +12,9 @@ hero:
     - theme: alt
       text: Client-side topics
       link: /Client-side/Cross-Site_Scripting
+    - theme: brand
+      text: Advanced topics
+      link: /Advanced/HTTP_Request_Smuggling
 
 # features:
 #   - title: 翻譯中...

