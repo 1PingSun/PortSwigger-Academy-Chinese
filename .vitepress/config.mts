@@ -7,6 +7,10 @@ export default defineConfig({
   description: "嘗試翻譯 PortSwigger Academy 上的文章中...",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
+    outline: {
+      level: [2, 7],
+    },
+
     nav: [
       { text: 'Home', link: '/' }
     ],
